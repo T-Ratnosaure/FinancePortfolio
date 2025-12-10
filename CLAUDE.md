@@ -3,6 +3,55 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 GO THROUGH THIS FILE WITH SERIOUS. RESPECT IT ALL EVERY TIME.
 
+---
+
+## ⚠️ MANDATORY WORKFLOW - READ FIRST ⚠️
+
+**These rules are NON-NEGOTIABLE. Failure to follow them is unacceptable.**
+
+### 1. ALWAYS USE AGENTS
+- **NEVER** try to do everything yourself
+- **ALWAYS** use the Task tool to launch specialized agents for their domains
+- Launch multiple agents in parallel when tasks are independent
+- Use managers (Jacques, Jean-David, Jean-Yves) for coordination
+
+### 2. AFTER EVERY MAJOR DEVELOPMENT
+After completing any significant feature, fix, or change:
+1. Create a new feature branch: `git checkout -b feat/description` or `fix/description`
+2. Commit changes with conventional commit messages
+3. Push the branch: `git push -u origin <branch-name>`
+4. **Launch review agents** before creating PR:
+   - `it-core-clovis` - Git workflow & code quality review
+   - `lamine-deployment-expert` - CI/CD & TDD review
+   - `legal-compliance-reviewer` or `legal-team-lead` - Compliance review
+5. Address all blocking feedback from reviewers
+
+### 3. CREATE PR THROUGH GITHUB CLI
+GitHub CLI (`gh`) is installed at: `"/c/Program Files/GitHub CLI/gh.exe"`
+```bash
+"/c/Program Files/GitHub CLI/gh.exe" pr create --title "type(scope): description" --body "..."
+"/c/Program Files/GitHub CLI/gh.exe" pr list
+"/c/Program Files/GitHub CLI/gh.exe" pr checks <number>
+"/c/Program Files/GitHub CLI/gh.exe" pr view <number>
+```
+
+### 4. MERGE ONLY IF CI PASSES
+- **NEVER** merge a PR if CI pipeline fails
+- Check CI status: `"/c/Program Files/GitHub CLI/gh.exe" pr checks <number>`
+- Wait for CI to complete before merging
+- If CI fails, fix the issues and push again
+- Merge command: `"/c/Program Files/GitHub CLI/gh.exe" pr merge <number> --squash --delete-branch`
+
+### 5. WRITE SPRINT REVIEW DOCUMENTATION
+After each sprint/major milestone, create/update `docs/reviews/sprint-X-review.md`:
+- What was accomplished
+- What's planned for next sprint
+- Compliance agent feedback summary
+- Any risks or concerns raised
+- Lessons learned
+
+---
+
 ## Project Overview
 
 FinancePortfolio is a Python 3.12 application managed with UV (fast Python package manager).
@@ -85,6 +134,59 @@ FinancePortfolio is a Python 3.12 application managed with UV (fast Python packa
 
 - use pydantic and langchain
 
+## Multi-Agent Architecture
+
+This project uses a multi-agent system. **Subagents MUST be called to work on tasks.**
+
+### When to Use Subagents
+- **ALWAYS** use the Task tool to launch specialized agents for their domains
+- **DO NOT** try to do everything yourself - delegate to the appropriate expert
+- Launch multiple agents in parallel when tasks are independent
+
+### Available Teams and When to Call Them
+
+| Team | Manager | When to Call |
+|------|---------|--------------|
+| **Research** | Jean-Yves | Portfolio analysis, ML models, market signals, quantitative analysis |
+| **Data** | Florian | Data pipelines, ETL, data quality, API integrations |
+| **Legal** | Marc | Compliance, tax optimization, regulatory questions |
+| **IT-Core** | Jean-David | Code quality, CI/CD, git workflow, security |
+| **Risk** | Nicolas | VaR, position limits, drawdown analysis |
+| **Execution** | Helena | Trading execution, backtesting |
+
+### Key Agents by Specialty
+
+| Agent | Specialty | Use When |
+|-------|-----------|----------|
+| `research-remy-stocks` | Equity quant, stochastic calculus | ETF analysis, volatility, options |
+| `iacopo-macro-futures-analyst` | Macro, rates, FX | Economic indicators, regime analysis |
+| `alexios-ml-predictor` | ML model design | Building predictors, feature engineering |
+| `antoine-nlp-expert` | NLP, sentiment | Text analysis, LLM integration |
+| `data-engineer` | Data pipelines | Data sourcing, ETL design |
+| `french-tax-optimizer` | French tax law | PEA optimization, tax strategy |
+| `lamine-deployment-expert` | CI/CD, TDD | Deployment, testing infrastructure |
+| `quality-control-enforcer` | Code quality | Review implementations |
+
+### Usage Pattern
+
+```
+1. Identify what expertise is needed
+2. Launch appropriate agent(s) with Task tool
+3. Run multiple agents in parallel when possible
+4. Synthesize outputs from multiple agents
+5. Use managers (Jacques, Jean-Yves, etc.) for coordination
+```
+
+### Example
+
+```
+User asks about portfolio optimization:
+1. Launch research-remy-stocks for ETF analysis
+2. Launch iacopo-macro-futures-analyst for regime detection
+3. Launch french-tax-optimizer for PEA considerations
+4. Synthesize all outputs into recommendation
+```
+
 ## Documentation
 
 ### README.md
@@ -136,35 +238,63 @@ FinancePortfolio is a Python 3.12 application managed with UV (fast Python packa
 
 ## Code Formatting
 
-1. Ruff
+1. isort (AUTHORITATIVE for import sorting)
+   - Check: `uv run isort --check-only --diff .`
+   - Fix: `uv run isort .`
+   - **isort always prevails** over other tools for import ordering
+   - Configuration in `pyproject.toml` uses "black" profile
+   - Ruff's import sorting rules (I) are disabled - isort is the authority
+   - Run isort BEFORE ruff format
+
+2. Ruff
    - Format: `uv run ruff format .`
    - Check: `uv run ruff check .`
    - Fix: `uv run ruff check . --fix`
    - Critical issues:
      - Line length (88 chars)
-     - Import sorting (I001)
      - Unused imports
+   - Note: Import sorting (I001) is handled by isort, not ruff
    - Line wrapping:
      - Strings: use parentheses
      - Function calls: multi-line with proper indent
      - Imports: split into multiple lines
 
-2. Type Checking
-  - run `pyrefly init` to start
-  - run `pyrefly check` after every change and fix resultings errors
+3. Type Checking
+   - run `pyrefly init` to start
+   - run `pyrefly check` after every change and fix resultings errors
    - Requirements:
      - Explicit None checks for Optional
      - Type narrowing for strings
      - Version warnings can be ignored if checks pass
+
+4. Security Scanning (Bandit)
+   - Check: `uv run bandit -c pyproject.toml -r .`
+   - Configuration in `pyproject.toml` (excludes tests, .venv)
+   - Severity levels: low, medium, high
+   - CI runs with `--severity-level medium` (medium+ issues fail)
+   - Ruff also has S rules (flake8-bandit) for fast feedback
+   - Bandit provides deeper analysis as second layer
+
+5. Complexity Analysis (Xenon)
+   - Check: `uv run xenon --max-absolute B --max-modules A --max-average A . --exclude ".venv,venv"`
+   - Grades: A (best) to F (worst)
+   - Thresholds:
+     - `--max-absolute B`: No single block worse than B
+     - `--max-modules A`: Module average must be A
+     - `--max-average A`: Overall average must be A
+   - Ruff C901 rule also enforces max-complexity of 10
 
 
 ## Error Resolution
 
 1. CI Failures
    - Fix order:
-     1. Formatting
-     2. Type errors
-     3. Linting
+     1. Import sorting (isort)
+     2. Formatting (ruff format)
+     3. Linting (ruff check)
+     4. Security issues (bandit)
+     5. Complexity issues (xenon)
+     6. Type errors
    - Type errors:
      - Get full line context
      - Check Optional types
