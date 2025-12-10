@@ -201,6 +201,77 @@ class Trade(BaseModel):
         return self
 
 
+class CashPosition(BaseModel):
+    """Cash position in the portfolio.
+
+    Attributes:
+        amount: Cash balance in euros
+        currency: Currency code (default: EUR)
+        updated_at: Last update timestamp
+    """
+
+    amount: Decimal = Field(ge=Decimal("0"))
+    currency: str = "EUR"
+    updated_at: datetime | None = None
+
+
+class PerformanceMetrics(BaseModel):
+    """Portfolio performance metrics over a time period.
+
+    Attributes:
+        start_date: Period start date
+        end_date: Period end date
+        start_value: Portfolio value at start
+        end_value: Portfolio value at end
+        total_return: Total return as decimal (0.10 = 10%)
+        annualized_return: Annualized return as decimal
+        volatility: Annualized volatility (standard deviation of returns)
+        sharpe_ratio: Sharpe ratio (assuming risk-free rate of 0)
+        max_drawdown: Maximum drawdown as decimal (negative value)
+        num_trades: Number of trades in period
+    """
+
+    start_date: date
+    end_date: date
+    start_value: Decimal = Field(ge=Decimal("0"))
+    end_value: Decimal = Field(ge=Decimal("0"))
+    total_return: float
+    annualized_return: float | None = None
+    volatility: float | None = None
+    sharpe_ratio: float | None = None
+    max_drawdown: float | None = None
+    num_trades: int = Field(ge=0, default=0)
+
+
+class DiscrepancyType(str, Enum):
+    """Type of discrepancy between database and broker."""
+
+    MISSING_IN_DB = "missing_in_db"  # Position exists at broker but not in DB
+    MISSING_AT_BROKER = "missing_at_broker"  # Position in DB but not at broker
+    SHARES_MISMATCH = "shares_mismatch"  # Share count differs
+    PRICE_MISMATCH = "price_mismatch"  # Price differs significantly
+
+
+class Discrepancy(BaseModel):
+    """Discrepancy between database and broker positions.
+
+    Attributes:
+        symbol: ETF symbol with discrepancy
+        discrepancy_type: Type of discrepancy found
+        db_value: Value in database (shares or price)
+        broker_value: Value at broker (shares or price)
+        difference: Absolute difference
+        description: Human-readable description
+    """
+
+    symbol: str
+    discrepancy_type: DiscrepancyType
+    db_value: float | None = None
+    broker_value: float | None = None
+    difference: float | None = None
+    description: str
+
+
 # Risk limits as constants (non-negotiable)
 MAX_LEVERAGED_EXPOSURE = 0.30  # LQQ + CL2 <= 30%
 MAX_SINGLE_POSITION = 0.25
