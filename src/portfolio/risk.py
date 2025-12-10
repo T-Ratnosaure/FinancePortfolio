@@ -22,11 +22,10 @@ from pydantic import BaseModel, Field
 from src.data.models import (
     DRAWDOWN_ALERT,
     MAX_LEVERAGED_EXPOSURE,
-    ETFSymbol,
     PEA_ETFS,
+    ETFSymbol,
     Position,
 )
-
 
 # Trading days per year for annualization
 TRADING_DAYS_PER_YEAR = 252

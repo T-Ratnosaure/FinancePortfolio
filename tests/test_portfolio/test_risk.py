@@ -8,10 +8,10 @@ import pytest
 
 from src.data.models import ETFSymbol, Position
 from src.portfolio.risk import (
+    MIN_OBSERVATIONS_VAR,
     InsufficientDataError,
     RiskCalculator,
     RiskReport,
-    MIN_OBSERVATIONS_VAR,
 )
 
 

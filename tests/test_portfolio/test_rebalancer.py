@@ -4,12 +4,12 @@ from decimal import Decimal
 
 import pytest
 
-from src.data.models import Position, ETFSymbol, TradeAction
+from src.data.models import ETFSymbol, Position, TradeAction
 from src.portfolio.rebalancer import (
     Rebalancer,
     RebalancerConfig,
-    TradeRecommendation,
     TradePriority,
+    TradeRecommendation,
 )
 from src.signals.allocation import AllocationError, AllocationOptimizer, RiskLimits
 
