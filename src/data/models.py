@@ -234,7 +234,7 @@ PEA_ETFS = {
         isin="FR0011869353",
         name="Amundi MSCI World UCITS ETF",
         leverage=1,
-        ter=0.002,
+        ter=0.0038,
         pea_eligible=True,
         accumulating=True,
     ),
