@@ -1,0 +1,447 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "last_updated": "2025-12-10",
+    "source": "Amundi ETF documentation and official PEA eligibility lists",
+    "warning": "PEA eligibility can change. Always verify current status with broker and AMF before investing.",
+    "disclaimer": "This data is for personal information only. Not investment advice."
+  },
+  "etfs": [
+    {
+      "ticker": "LQQ",
+      "isin": "FR0010342592",
+      "name": "Amundi Nasdaq-100 Daily (2x) Leveraged UCITS ETF",
+      "name_fr": "Amundi Nasdaq-100 Daily (2x) Leveraged UCITS ETF",
+      "provider": "Amundi",
+      "underlying_index": "NASDAQ-100",
+      "underlying_index_description": "100 largest non-financial companies listed on NASDAQ",
+      "leverage_factor": 2.0,
+      "leverage_type": "daily",
+      "leverage_reset": "daily",
+      "replication_method": "synthetic",
+      "replication_method_fr": "synthétique (swap)",
+      "accumulating": true,
+      "dividend_policy": "Accumulating (reinvested)",
+      "dividend_policy_fr": "Capitalisation (dividendes réinvestis)",
+      "currency": "EUR",
+      "ter_percent": 0.60,
+      "ter_notes": "Total Expense Ratio includes management fees and operational costs. Higher than non-leveraged ETFs due to leverage costs.",
+      "pea_eligible": true,
+      "pea_eligibility_basis": "UCITS ETF domiciled in France with sufficient EU equity exposure",
+      "domicile": "France",
+      "listing_exchange": "Euronext Paris",
+      "inception_date": "2008-07-07",
+      "aum_approximate_eur": "1B+",
+      "average_daily_volume": "High liquidity",
+      "primary_exposure": "US Technology sector via leveraged Nasdaq-100",
+      "primary_exposure_fr": "Secteur technologique américain via effet de levier Nasdaq-100",
+      "geographic_exposure": {
+        "US": 100,
+        "EU": 0,
+        "other": 0
+      },
+      "sector_concentration": {
+        "Technology": 60,
+        "Consumer Discretionary": 20,
+        "Communication Services": 15,
+        "Other": 5
+      },
+      "top_holdings_note": "Synthetic replication via swap. Physical holdings may differ from index components.",
+      "risks": [
+        "2x daily leverage amplifies both gains and losses",
+        "Volatility decay in sideways or volatile markets",
+        "Daily rebalancing creates path dependency",
+        "High TER (0.60%) reduces long-term returns",
+        "Concentrated exposure to US tech sector",
+        "Currency risk (USD/EUR) despite EUR denomination",
+        "Counterparty risk from synthetic replication",
+        "Not suitable for long-term buy-and-hold without monitoring"
+      ],
+      "risks_fr": [
+        "Effet de levier 2x quotidien amplifie gains et pertes",
+        "Érosion par volatilité dans marchés latéraux ou volatils",
+        "Rebalançage quotidien crée dépendance au chemin",
+        "TER élevé (0,60%) réduit rendements long terme",
+        "Exposition concentrée au secteur tech américain",
+        "Risque de change (USD/EUR) malgré cotation en EUR",
+        "Risque de contrepartie lié à réplication synthétique",
+        "Inadapté au buy-and-hold long terme sans surveillance"
+      ],
+      "suitable_for": [
+        "Experienced investors with high risk tolerance",
+        "Short to medium-term tactical allocation",
+        "Active monitoring and portfolio management",
+        "Bullish conviction on US tech sector"
+      ],
+      "suitable_for_fr": [
+        "Investisseurs expérimentés à tolérance au risque élevée",
+        "Allocation tactique court à moyen terme",
+        "Surveillance active et gestion de portefeuille",
+        "Conviction haussière sur secteur tech américain"
+      ],
+      "not_suitable_for": [
+        "Risk-averse investors",
+        "Long-term passive investors",
+        "Retirement core holdings",
+        "Investors who cannot monitor positions regularly"
+      ],
+      "links": {
+        "amundi_product_page": "https://www.amundietf.fr/fr/professional/products/equity/amundi-nasdaq-100-daily-2x-leveraged-ucits-etf-acc/fr0010342592",
+        "kiid": "https://www.amundietf.fr/kiid/FR0010342592",
+        "factsheet": "https://www.amundietf.fr/factsheet/FR0010342592"
+      }
+    },
+    {
+      "ticker": "CL2",
+      "isin": "FR0010755611",
+      "name": "Amundi MSCI USA Daily (2x) Leveraged UCITS ETF",
+      "name_fr": "Amundi MSCI USA Daily (2x) Leveraged UCITS ETF",
+      "provider": "Amundi",
+      "underlying_index": "MSCI USA",
+      "underlying_index_description": "Large and mid-cap stocks across the US equity market",
+      "leverage_factor": 2.0,
+      "leverage_type": "daily",
+      "leverage_reset": "daily",
+      "replication_method": "synthetic",
+      "replication_method_fr": "synthétique (swap)",
+      "accumulating": true,
+      "dividend_policy": "Accumulating (reinvested)",
+      "dividend_policy_fr": "Capitalisation (dividendes réinvestis)",
+      "currency": "EUR",
+      "ter_percent": 0.50,
+      "ter_notes": "Total Expense Ratio includes management fees and operational costs. Lower than LQQ but still high due to leverage costs.",
+      "pea_eligible": true,
+      "pea_eligibility_basis": "UCITS ETF domiciled in France with sufficient EU equity exposure",
+      "domicile": "France",
+      "listing_exchange": "Euronext Paris",
+      "inception_date": "2010-03-18",
+      "aum_approximate_eur": "500M+",
+      "average_daily_volume": "Moderate to high liquidity",
+      "primary_exposure": "Broad US equity market via leveraged MSCI USA",
+      "primary_exposure_fr": "Marché actions américain large via effet de levier MSCI USA",
+      "geographic_exposure": {
+        "US": 100,
+        "EU": 0,
+        "other": 0
+      },
+      "sector_concentration": {
+        "Technology": 30,
+        "Financials": 15,
+        "Healthcare": 13,
+        "Consumer Discretionary": 11,
+        "Communication Services": 9,
+        "Industrials": 8,
+        "Consumer Staples": 6,
+        "Other": 8
+      },
+      "top_holdings_note": "Synthetic replication via swap. Physical holdings may differ from index components.",
+      "risks": [
+        "2x daily leverage amplifies both gains and losses",
+        "Volatility decay in sideways or volatile markets",
+        "Daily rebalancing creates path dependency",
+        "High TER (0.50%) reduces long-term returns",
+        "Broad but concentrated exposure to US market",
+        "Currency risk (USD/EUR) despite EUR denomination",
+        "Counterparty risk from synthetic replication",
+        "Sector concentration risk (tech, financials)"
+      ],
+      "risks_fr": [
+        "Effet de levier 2x quotidien amplifie gains et pertes",
+        "Érosion par volatilité dans marchés latéraux ou volatils",
+        "Rebalançage quotidien crée dépendance au chemin",
+        "TER élevé (0,50%) réduit rendements long terme",
+        "Exposition large mais concentrée sur marché américain",
+        "Risque de change (USD/EUR) malgré cotation en EUR",
+        "Risque de contrepartie lié à réplication synthétique",
+        "Risque de concentration sectorielle (tech, finance)"
+      ],
+      "suitable_for": [
+        "Experienced investors with high risk tolerance",
+        "Short to medium-term tactical allocation",
+        "Active monitoring and portfolio management",
+        "Bullish conviction on broad US equity market",
+        "Diversification alternative to Nasdaq-focused LQQ"
+      ],
+      "suitable_for_fr": [
+        "Investisseurs expérimentés à tolérance au risque élevée",
+        "Allocation tactique court à moyen terme",
+        "Surveillance active et gestion de portefeuille",
+        "Conviction haussière sur marché actions américain large",
+        "Alternative de diversification au LQQ focalisé Nasdaq"
+      ],
+      "not_suitable_for": [
+        "Risk-averse investors",
+        "Long-term passive investors",
+        "Retirement core holdings",
+        "Investors who cannot monitor positions regularly"
+      ],
+      "links": {
+        "amundi_product_page": "https://www.amundietf.fr/fr/professional/products/equity/amundi-msci-usa-daily-2x-leveraged-ucits-etf-acc/fr0010755611",
+        "kiid": "https://www.amundietf.fr/kiid/FR0010755611",
+        "factsheet": "https://www.amundietf.fr/factsheet/FR0010755611"
+      }
+    },
+    {
+      "ticker": "WPEA",
+      "isin": "FR0011869353",
+      "name": "Amundi MSCI World UCITS ETF EUR (C)",
+      "name_fr": "Amundi MSCI World UCITS ETF EUR (C)",
+      "provider": "Amundi",
+      "underlying_index": "MSCI World",
+      "underlying_index_description": "Large and mid-cap stocks across developed markets worldwide",
+      "leverage_factor": 1.0,
+      "leverage_type": "none",
+      "leverage_reset": "N/A",
+      "replication_method": "synthetic",
+      "replication_method_fr": "synthétique (swap)",
+      "accumulating": true,
+      "dividend_policy": "Accumulating (reinvested)",
+      "dividend_policy_fr": "Capitalisation (dividendes réinvestis)",
+      "currency": "EUR",
+      "ter_percent": 0.38,
+      "ter_notes": "Total Expense Ratio. Competitive for global equity exposure. Note: Some sources indicate TER closer to 0.20% for similar Amundi World ETFs; verify current prospectus.",
+      "pea_eligible": true,
+      "pea_eligibility_basis": "UCITS ETF domiciled in France structured to meet PEA eligibility requirements (75%+ EU exposure through specific construction)",
+      "domicile": "France",
+      "listing_exchange": "Euronext Paris",
+      "inception_date": "2013-12-20",
+      "aum_approximate_eur": "Multi-billion EUR",
+      "average_daily_volume": "High liquidity",
+      "primary_exposure": "Global developed markets equity",
+      "primary_exposure_fr": "Actions mondiales marchés développés",
+      "geographic_exposure": {
+        "US": 70,
+        "EU": 15,
+        "Japan": 6,
+        "UK": 4,
+        "Canada": 3,
+        "Other": 2
+      },
+      "sector_concentration": {
+        "Technology": 24,
+        "Financials": 15,
+        "Healthcare": 12,
+        "Consumer Discretionary": 11,
+        "Industrials": 10,
+        "Communication Services": 8,
+        "Consumer Staples": 7,
+        "Energy": 4,
+        "Materials": 4,
+        "Utilities": 3,
+        "Real Estate": 2
+      },
+      "top_holdings_note": "Synthetic replication. Broad diversification across 1,500+ companies in developed markets.",
+      "risks": [
+        "Market risk from global equity exposure",
+        "Currency risk (primarily USD exposure despite EUR denomination)",
+        "Counterparty risk from synthetic replication",
+        "Concentration in US market (70% of index)",
+        "Sector concentration risk (technology 24%)",
+        "No leverage, but still subject to market volatility",
+        "Liquidity risk in smaller positions"
+      ],
+      "risks_fr": [
+        "Risque de marché lié à exposition actions mondiales",
+        "Risque de change (exposition USD majoritaire malgré cotation EUR)",
+        "Risque de contrepartie lié à réplication synthétique",
+        "Concentration sur marché américain (70% de l'indice)",
+        "Risque de concentration sectorielle (technologie 24%)",
+        "Pas de levier, mais soumis à volatilité de marché",
+        "Risque de liquidité sur positions plus petites"
+      ],
+      "suitable_for": [
+        "Long-term investors seeking global diversification",
+        "Core portfolio holding for PEA accounts",
+        "Moderate to high risk tolerance investors",
+        "Passive buy-and-hold strategy",
+        "Retirement savings with long time horizon",
+        "Complementary position to balance leveraged ETFs"
+      ],
+      "suitable_for_fr": [
+        "Investisseurs long terme cherchant diversification mondiale",
+        "Position cœur de portefeuille pour comptes PEA",
+        "Investisseurs tolérance au risque modérée à élevée",
+        "Stratégie passive buy-and-hold",
+        "Épargne retraite avec horizon long terme",
+        "Position complémentaire pour équilibrer ETF à levier"
+      ],
+      "not_suitable_for": [
+        "Very conservative investors",
+        "Short-term trading (due to lower volatility)",
+        "Investors seeking only European exposure",
+        "Investors uncomfortable with synthetic replication"
+      ],
+      "links": {
+        "amundi_product_page": "https://www.amundietf.fr/fr/professional/products/equity/amundi-msci-world-ucits-etf-eur-c/fr0011869353",
+        "kiid": "https://www.amundietf.fr/kiid/FR0011869353",
+        "factsheet": "https://www.amundietf.fr/factsheet/FR0011869353"
+      }
+    }
+  ],
+  "comparison": {
+    "leverage_comparison": {
+      "LQQ": {
+        "leverage": "2x daily",
+        "volatility": "Highest - technology sector concentration",
+        "ter": "0.60%",
+        "suitable_horizon": "Short to medium-term (with active monitoring)",
+        "risk_level": "Very High"
+      },
+      "CL2": {
+        "leverage": "2x daily",
+        "volatility": "High - broad market but leveraged",
+        "ter": "0.50%",
+        "suitable_horizon": "Short to medium-term (with active monitoring)",
+        "risk_level": "Very High"
+      },
+      "WPEA": {
+        "leverage": "None (1x)",
+        "volatility": "Moderate - diversified global exposure",
+        "ter": "~0.20-0.38%",
+        "suitable_horizon": "Long-term buy-and-hold (5+ years)",
+        "risk_level": "Moderate to High"
+      }
+    },
+    "allocation_strategies": {
+      "aggressive_growth": {
+        "description": "Maximum growth potential with high risk",
+        "allocation": {
+          "LQQ": 40,
+          "CL2": 40,
+          "WPEA": 20
+        },
+        "risk_profile": "Very High",
+        "monitoring_frequency": "Weekly",
+        "notes": "Requires active management and high risk tolerance. Not suitable for most investors."
+      },
+      "balanced_growth": {
+        "description": "Growth with moderate risk through diversification",
+        "allocation": {
+          "LQQ": 25,
+          "CL2": 25,
+          "WPEA": 50
+        },
+        "risk_profile": "High",
+        "monitoring_frequency": "Bi-weekly to monthly",
+        "notes": "More sustainable for medium-term horizons. WPEA provides stability."
+      },
+      "conservative_growth": {
+        "description": "Stable growth with limited leverage exposure",
+        "allocation": {
+          "LQQ": 10,
+          "CL2": 10,
+          "WPEA": 80
+        },
+        "risk_profile": "Moderate to High",
+        "monitoring_frequency": "Monthly",
+        "notes": "Suitable for longer time horizons and lower risk tolerance. Leveraged positions as satellite holdings."
+      },
+      "core_only": {
+        "description": "Pure global diversification without leverage",
+        "allocation": {
+          "LQQ": 0,
+          "CL2": 0,
+          "WPEA": 100
+        },
+        "risk_profile": "Moderate",
+        "monitoring_frequency": "Quarterly",
+        "notes": "Most suitable for long-term PEA holders (5+ years). Classic buy-and-hold strategy."
+      }
+    }
+  },
+  "tax_considerations": {
+    "pea_tax_treatment": {
+      "holding_period_less_than_5_years": {
+        "tax_on_gains": "PFU 30% (12.8% income tax + 17.2% social charges) OR progressive income tax scale + 17.2% social charges",
+        "withdrawal_consequence": "Permanent closure of PEA",
+        "notes": "Very unfavorable. Avoid withdrawals before 5 years."
+      },
+      "holding_period_5_years_or_more": {
+        "tax_on_gains": "0% income tax + 17.2% social charges on gains only",
+        "withdrawal_consequence": "Partial withdrawals allowed without closure. New contributions prohibited after first withdrawal.",
+        "notes": "Significant tax advantage. Primary reason to use PEA."
+      },
+      "contribution_limit": "€150,000 maximum (excluding gains)",
+      "pea_pme_additional_limit": "€225,000 additional for PEA-PME",
+      "optimal_strategy": "Hold for minimum 5 years to benefit from income tax exemption"
+    },
+    "accumulating_advantage": {
+      "description": "All three ETFs are accumulating (capitalizing), meaning dividends are automatically reinvested",
+      "benefit": "No taxable event from dividends while holding. Only taxed on final gains upon withdrawal.",
+      "comparison_to_distributing": "Distributing ETFs would trigger annual taxation on dividends, reducing compounding effect."
+    }
+  },
+  "monitoring_requirements": {
+    "eligibility_checks": {
+      "frequency": "Quarterly",
+      "sources": [
+        "Broker's PEA-eligible ETF list",
+        "Amundi official communications",
+        "AMF official register"
+      ],
+      "action_if_ineligible": "Immediate sale required to maintain PEA status"
+    },
+    "performance_monitoring": {
+      "frequency": "Monthly for WPEA, Weekly for LQQ/CL2",
+      "key_metrics": [
+        "Total return vs. benchmark",
+        "Tracking error",
+        "Volatility decay (for leveraged ETFs)",
+        "Portfolio allocation drift"
+      ]
+    },
+    "risk_monitoring": {
+      "frequency": "Monthly",
+      "key_metrics": [
+        "Portfolio volatility",
+        "Maximum drawdown",
+        "Sharpe ratio",
+        "Correlation between positions"
+      ],
+      "action_triggers": [
+        "Rebalance if allocation drifts >5% from target",
+        "Consider de-risking if drawdown exceeds personal threshold",
+        "Review strategy if volatility decay erodes leveraged positions significantly"
+      ]
+    }
+  },
+  "important_notes": [
+    "This data is current as of 2025-12-10. Always verify current information before investing.",
+    "PEA eligibility can change due to regulatory updates or ETF composition changes.",
+    "TER (Total Expense Ratio) is deducted automatically from ETF performance.",
+    "Leveraged ETFs (LQQ, CL2) are NOT suitable for passive buy-and-hold without active monitoring.",
+    "Currency risk exists despite EUR denomination due to underlying US equity exposure.",
+    "Synthetic replication involves counterparty risk - review KIID documents for details.",
+    "This is personal reference data, not investment advice. Consult a professional advisor for personalized guidance.",
+    "Always read the KIID (Key Investor Information Document) before investing.",
+    "Past performance does not predict future results.",
+    "You can lose all of your invested capital."
+  ],
+  "important_notes_fr": [
+    "Ces données sont à jour au 2025-12-10. Toujours vérifier les informations actuelles avant d'investir.",
+    "L'éligibilité au PEA peut changer suite à des mises à jour réglementaires ou des changements de composition des ETF.",
+    "Les TER (frais totaux) sont automatiquement déduits de la performance de l'ETF.",
+    "Les ETF à levier (LQQ, CL2) ne conviennent PAS à une stratégie buy-and-hold passive sans surveillance active.",
+    "Le risque de change existe malgré la cotation en EUR en raison de l'exposition sous-jacente aux actions américaines.",
+    "La réplication synthétique implique un risque de contrepartie - consultez les DICI pour les détails.",
+    "Ceci est une référence personnelle, pas un conseil en investissement. Consultez un conseiller professionnel pour un accompagnement personnalisé.",
+    "Lisez toujours le DICI (Document d'Information Clé pour l'Investisseur) avant d'investir.",
+    "Les performances passées ne préjugent pas des résultats futurs.",
+    "Vous pouvez perdre la totalité de votre capital investi."
+  ],
+  "resources": {
+    "regulatory": {
+      "amf": "https://www.amf-france.org",
+      "amf_pea_guide": "https://www.amf-france.org/fr/espace-epargnants/comprendre-les-produits-financiers/comptes-titres-pea",
+      "euronext_etf_list": "https://www.euronext.com/en/products/etfs"
+    },
+    "provider": {
+      "amundi_etf_homepage": "https://www.amundietf.fr",
+      "amundi_pea_guide": "https://www.amundietf.fr/fr/solutions/pea"
+    },
+    "tax": {
+      "impots_gouv": "https://www.impots.gouv.fr",
+      "bofip_pea": "https://bofip.impots.gouv.fr (search for 'PEA')"
+    }
+  }
+}
