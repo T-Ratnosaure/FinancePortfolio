@@ -511,7 +511,7 @@ class RegimeDetector:
             raise FileNotFoundError(f"Model file not found: {load_path}")
 
         with open(load_path, "rb") as f:
-            model_state = pickle.load(f)  # noqa: S301
+            model_state = pickle.load(f)  # noqa: S301  # nosec B301
 
         # Validate loaded state
         required_keys = {
