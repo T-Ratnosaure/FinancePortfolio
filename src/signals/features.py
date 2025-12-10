@@ -70,9 +70,7 @@ class FeatureSet(BaseModel):
     price_vs_ma200: float = Field(
         gt=0.0, description="Current price / 200-day MA ratio"
     )
-    ma50_vs_ma200: float = Field(
-        gt=0.0, description="50-day MA / 200-day MA ratio"
-    )
+    ma50_vs_ma200: float = Field(gt=0.0, description="50-day MA / 200-day MA ratio")
     momentum_3m: float = Field(description="3-month return (decimal)")
 
     # Credit/Macro features
@@ -80,9 +78,7 @@ class FeatureSet(BaseModel):
         description="10Y - 2Y Treasury spread in percentage points"
     )
     hy_spread: float = Field(ge=0.0, description="High yield OAS spread")
-    hy_spread_change_1m: float = Field(
-        description="1-month change in HY spread"
-    )
+    hy_spread_change_1m: float = Field(description="1-month change in HY spread")
 
     @model_validator(mode="after")
     def validate_feature_consistency(self) -> "FeatureSet":
@@ -119,17 +115,19 @@ class FeatureSet(BaseModel):
         Returns:
             1D numpy array with features in consistent order.
         """
-        return np.array([
-            self.vix_level,
-            self.vix_percentile_20d,
-            self.realized_vol_20d,
-            self.price_vs_ma200,
-            self.ma50_vs_ma200,
-            self.momentum_3m,
-            self.yield_curve_slope,
-            self.hy_spread,
-            self.hy_spread_change_1m,
-        ])
+        return np.array(
+            [
+                self.vix_level,
+                self.vix_percentile_20d,
+                self.realized_vol_20d,
+                self.price_vs_ma200,
+                self.ma50_vs_ma200,
+                self.momentum_3m,
+                self.yield_curve_slope,
+                self.hy_spread,
+                self.hy_spread_change_1m,
+            ]
+        )
 
     @classmethod
     def feature_names(cls) -> list[str]:
@@ -240,9 +238,7 @@ class FeatureCalculator:
         vix_clean = self._prepare_series(vix_series)
         price_clean = self._prepare_series(price_series)
 
-        self._validate_series_length(
-            vix_clean, self.MIN_DAYS_VOLATILITY, "vix_level"
-        )
+        self._validate_series_length(vix_clean, self.MIN_DAYS_VOLATILITY, "vix_level")
         self._validate_series_length(
             price_clean, self.MIN_DAYS_VOLATILITY, "realized_vol"
         )
@@ -251,10 +247,8 @@ class FeatureCalculator:
         vix_level = float(vix_clean.iloc[-1])
 
         # VIX percentile over last 20 days
-        vix_20d = vix_clean.iloc[-self.MIN_DAYS_VOLATILITY:]
-        vix_percentile = float(
-            (vix_20d < vix_level).sum() / len(vix_20d)
-        )
+        vix_20d = vix_clean.iloc[-self.MIN_DAYS_VOLATILITY :]
+        vix_percentile = float((vix_20d < vix_level).sum() / len(vix_20d))
 
         # 20-day realized volatility (annualized)
         returns = price_clean.pct_change().dropna()
@@ -265,10 +259,8 @@ class FeatureCalculator:
                 len(returns),
             )
 
-        returns_20d = returns.iloc[-self.MIN_DAYS_VOLATILITY:]
-        realized_vol = float(
-            returns_20d.std() * np.sqrt(self.TRADING_DAYS_PER_YEAR)
-        )
+        returns_20d = returns.iloc[-self.MIN_DAYS_VOLATILITY :]
+        realized_vol = float(returns_20d.std() * np.sqrt(self.TRADING_DAYS_PER_YEAR))
 
         return {
             "vix_level": vix_level,
@@ -276,9 +268,7 @@ class FeatureCalculator:
             "realized_vol_20d": realized_vol,
         }
 
-    def calculate_trend_features(
-        self, price_series: pd.Series
-    ) -> dict[str, float]:
+    def calculate_trend_features(self, price_series: pd.Series) -> dict[str, float]:
         """Calculate trend-related features.
 
         Trend features capture market direction and momentum:
@@ -297,9 +287,7 @@ class FeatureCalculator:
         """
         price_clean = self._prepare_series(price_series)
 
-        self._validate_series_length(
-            price_clean, self.MIN_DAYS_TREND, "trend_features"
-        )
+        self._validate_series_length(price_clean, self.MIN_DAYS_TREND, "trend_features")
 
         current_price = float(price_clean.iloc[-1])
 
@@ -352,15 +340,9 @@ class FeatureCalculator:
         t10y_clean = self._prepare_series(treasury_10y)
         hy_clean = self._prepare_series(hy_spread)
 
-        self._validate_series_length(
-            t2y_clean, self.MIN_DAYS_MACRO, "treasury_2y"
-        )
-        self._validate_series_length(
-            t10y_clean, self.MIN_DAYS_MACRO, "treasury_10y"
-        )
-        self._validate_series_length(
-            hy_clean, self.MIN_DAYS_MACRO, "hy_spread"
-        )
+        self._validate_series_length(t2y_clean, self.MIN_DAYS_MACRO, "treasury_2y")
+        self._validate_series_length(t10y_clean, self.MIN_DAYS_MACRO, "treasury_10y")
+        self._validate_series_length(hy_clean, self.MIN_DAYS_MACRO, "hy_spread")
 
         # Yield curve slope (10Y - 2Y)
         yield_curve_slope = float(t10y_clean.iloc[-1] - t2y_clean.iloc[-1])
@@ -464,16 +446,13 @@ class FeatureCalculator:
 
         # Align all dataframes to common index
         all_dates = (
-            vix_df.index
-            .intersection(price_df.index)
+            vix_df.index.intersection(price_df.index)
             .intersection(treasury_df.index)
             .intersection(hy_spread_df.index)
         )
 
         if len(all_dates) == 0:
-            raise InsufficientDataError(
-                "feature_history", self.MIN_DAYS_TREND, 0
-            )
+            raise InsufficientDataError("feature_history", self.MIN_DAYS_TREND, 0)
 
         # Apply date filters
         if start_date is not None:
@@ -487,9 +466,7 @@ class FeatureCalculator:
         min_offset = self.MIN_DAYS_TREND
 
         if len(all_dates) < min_offset:
-            raise InsufficientDataError(
-                "feature_history", min_offset, len(all_dates)
-            )
+            raise InsufficientDataError("feature_history", min_offset, len(all_dates))
 
         # Calculate features for each date
         feature_records: list[dict[str, float | date]] = []
