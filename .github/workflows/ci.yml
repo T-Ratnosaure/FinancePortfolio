@@ -29,11 +29,20 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras --dev
 
+      - name: Check import sorting with isort
+        run: uv run isort --check-only --diff .
+
       - name: Check code formatting with Ruff
         run: uv run ruff format --check .
 
       - name: Lint with Ruff
         run: uv run ruff check . --ignore UP046,B008
+
+      - name: Security scan with Bandit
+        run: uv run bandit -c pyproject.toml -r . --severity-level medium
+
+      - name: Complexity check with Xenon
+        run: uv run xenon --max-absolute B --max-modules A --max-average A . --exclude ".venv,venv"
 
       - name: Run tests with pytest
         run: uv run pytest -v --cov --cov-report=term-missing
