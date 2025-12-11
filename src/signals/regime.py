@@ -16,11 +16,12 @@ Key Design Decisions:
 - Model validates feature dimensions to prevent prediction errors
 """
 
+import json
 import logging
-import pickle
 from pathlib import Path
 from typing import Literal
 
+import joblib
 import numpy as np
 from hmmlearn.hmm import GaussianHMM
 from pydantic import BaseModel, Field
@@ -28,6 +29,12 @@ from pydantic import BaseModel, Field
 from src.data.models import Regime
 
 logger = logging.getLogger(__name__)
+
+# Constants for secure model storage
+MODEL_FORMAT_VERSION = "1.0"
+MODEL_FILE_SUFFIX = ".joblib"
+CONFIG_FILE_SUFFIX = "_config.json"
+ARRAYS_FILE_SUFFIX = "_arrays.npz"
 
 
 class RegimeDetectorConfig(BaseModel):
@@ -461,83 +468,144 @@ class RegimeDetector:
         return regime_stationary
 
     def save(self, path: str) -> None:
-        """Save the fitted model to disk.
+        """Save the fitted model to disk securely.
 
-        Saves the complete model state including the HMM parameters,
-        state-to-regime mapping, and feature standardization statistics.
+        Uses a secure multi-file format:
+        - HMM model: saved with joblib (standard for scikit-learn models)
+        - Config: saved as JSON (safe, human-readable)
+        - Arrays: saved with numpy compressed format
+
+        The path should be a base path without extension. Three files will
+        be created: {path}.joblib, {path}_config.json, {path}_arrays.npz
 
         Args:
-            path: File path for the saved model (typically .pkl extension).
+            path: Base file path for the saved model (without extension).
 
         Raises:
             NotFittedError: If the model has not been fitted.
         """
         self._validate_fitted()
 
-        model_state = {
+        base_path = Path(path)
+        base_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Save HMM model with joblib (safer than pickle for sklearn models)
+        model_path = base_path.with_suffix(MODEL_FILE_SUFFIX)
+        joblib.dump(self._model, model_path)
+
+        # Save config as JSON (safe, text-based format)
+        config_path = base_path.parent / f"{base_path.name}{CONFIG_FILE_SUFFIX}"
+        config_data = {
+            "format_version": MODEL_FORMAT_VERSION,
             "config": self.config.model_dump(),
-            "model": self._model,
-            "state_to_regime": self._state_to_regime,
             "n_features": self._n_features,
-            "feature_means": self._feature_means,
-            "feature_stds": self._feature_stds,
+            "state_to_regime": {
+                str(k): v.value
+                for k, v in self._state_to_regime.items()  # type: ignore[union-attr]
+            },
         }
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=2)
 
-        save_path = Path(path)
-        save_path.parent.mkdir(parents=True, exist_ok=True)
+        # Save numpy arrays with native format (safe, efficient)
+        arrays_path = base_path.parent / f"{base_path.name}{ARRAYS_FILE_SUFFIX}"
+        # Only save arrays if they exist (model must be fitted)
+        if self._feature_means is not None and self._feature_stds is not None:
+            np.savez_compressed(
+                arrays_path,
+                feature_means=self._feature_means,
+                feature_stds=self._feature_stds,
+            )
+        else:
+            np.savez_compressed(
+                arrays_path,
+                feature_means=np.array([]),
+                feature_stds=np.array([]),
+            )
 
-        with open(save_path, "wb") as f:
-            pickle.dump(model_state, f)  # noqa: S301
-
-        logger.info(f"Model saved to {save_path}")
+        logger.info(f"Model saved securely to {base_path}")
 
     @classmethod
     def load(cls, path: str) -> "RegimeDetector":
-        """Load a fitted model from disk.
+        """Load a fitted model from disk securely.
+
+        Loads from the secure multi-file format created by save().
+        The path should be the base path used during saving.
 
         Args:
-            path: File path to the saved model.
+            path: Base file path to the saved model (without extension).
 
         Returns:
             Loaded RegimeDetector with fitted model.
 
         Raises:
-            FileNotFoundError: If the model file does not exist.
+            FileNotFoundError: If any model file does not exist.
             ValueError: If the file contains invalid model data.
         """
-        load_path = Path(path)
+        base_path = Path(path)
 
-        if not load_path.exists():
-            raise FileNotFoundError(f"Model file not found: {load_path}")
+        # Determine file paths
+        model_path = base_path.with_suffix(MODEL_FILE_SUFFIX)
+        config_path = base_path.parent / f"{base_path.name}{CONFIG_FILE_SUFFIX}"
+        arrays_path = base_path.parent / f"{base_path.name}{ARRAYS_FILE_SUFFIX}"
 
-        with open(load_path, "rb") as f:
-            model_state = pickle.load(f)  # noqa: S301  # nosec B301
+        # Validate all files exist
+        for file_path, desc in [
+            (model_path, "model"),
+            (config_path, "config"),
+            (arrays_path, "arrays"),
+        ]:
+            if not file_path.exists():
+                raise FileNotFoundError(f"Model {desc} file not found: {file_path}")
 
-        # Validate loaded state
-        required_keys = {
-            "config",
-            "model",
-            "state_to_regime",
-            "n_features",
-            "feature_means",
-            "feature_stds",
-        }
-        if not required_keys.issubset(model_state.keys()):
-            raise ValueError(
-                f"Invalid model file. Missing keys: "
-                f"{required_keys - set(model_state.keys())}"
+        # Load config from JSON (safe)
+        with open(config_path, encoding="utf-8") as f:
+            config_data = json.load(f)
+
+        # Validate format version
+        format_version = config_data.get("format_version")
+        if format_version != MODEL_FORMAT_VERSION:
+            logger.warning(
+                f"Model format version mismatch. Expected {MODEL_FORMAT_VERSION}, "
+                f"got {format_version}. Loading may fail."
             )
 
-        # Reconstruct the detector
-        config = RegimeDetectorConfig(**model_state["config"])
-        detector = cls(config=config)
-        detector._model = model_state["model"]
-        detector._state_to_regime = model_state["state_to_regime"]
-        detector._n_features = model_state["n_features"]
-        detector._feature_means = model_state["feature_means"]
-        detector._feature_stds = model_state["feature_stds"]
+        # Validate required keys
+        required_keys = {"config", "n_features", "state_to_regime"}
+        if not required_keys.issubset(config_data.keys()):
+            raise ValueError(
+                f"Invalid config file. Missing keys: "
+                f"{required_keys - set(config_data.keys())}"
+            )
 
-        logger.info(f"Model loaded from {load_path}")
+        # Load HMM model with joblib
+        model = joblib.load(model_path)
+
+        # Validate loaded model type
+        if not isinstance(model, GaussianHMM):
+            raise ValueError(
+                f"Invalid model type. Expected GaussianHMM, got {type(model).__name__}"
+            )
+
+        # Load numpy arrays
+        arrays = np.load(arrays_path)
+        feature_means = arrays["feature_means"]
+        feature_stds = arrays["feature_stds"]
+
+        # Reconstruct the detector
+        config = RegimeDetectorConfig(**config_data["config"])
+        detector = cls(config=config)
+        detector._model = model
+        detector._n_features = config_data["n_features"]
+        detector._feature_means = feature_means
+        detector._feature_stds = feature_stds
+
+        # Reconstruct state_to_regime mapping with proper Regime enums
+        detector._state_to_regime = {
+            int(k): Regime(v) for k, v in config_data["state_to_regime"].items()
+        }
+
+        logger.info(f"Model loaded securely from {base_path}")
 
         return detector
 

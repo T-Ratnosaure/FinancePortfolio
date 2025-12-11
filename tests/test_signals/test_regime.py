@@ -431,24 +431,28 @@ class TestRegimeDetectorPersistence:
         return detector
 
     def test_save_creates_file(self, fitted_detector: RegimeDetector) -> None:
-        """Test that save creates a file."""
+        """Test that save creates the multi-file format."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "model.pkl"
-            fitted_detector.save(str(path))
-            assert path.exists()
+            # Use base path without extension for new format
+            base_path = Path(tmpdir) / "model"
+            fitted_detector.save(str(base_path))
+            # Check all three files are created
+            assert (base_path.with_suffix(".joblib")).exists()
+            assert (base_path.parent / f"{base_path.name}_config.json").exists()
+            assert (base_path.parent / f"{base_path.name}_arrays.npz").exists()
 
     def test_save_before_fit_raises(self) -> None:
         """Test that saving before fit raises NotFittedError."""
         detector = RegimeDetector()
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "model.pkl"
+            path = Path(tmpdir) / "model"
             with pytest.raises(NotFittedError):
                 detector.save(str(path))
 
     def test_load_returns_detector(self, fitted_detector: RegimeDetector) -> None:
         """Test that load returns a RegimeDetector."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "model.pkl"
+            path = Path(tmpdir) / "model"
             fitted_detector.save(str(path))
 
             loaded = RegimeDetector.load(str(path))
@@ -457,7 +461,7 @@ class TestRegimeDetectorPersistence:
     def test_load_preserves_config(self, fitted_detector: RegimeDetector) -> None:
         """Test that load preserves configuration."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "model.pkl"
+            path = Path(tmpdir) / "model"
             fitted_detector.save(str(path))
 
             loaded = RegimeDetector.load(str(path))
@@ -471,7 +475,7 @@ class TestRegimeDetectorPersistence:
         original_probs = fitted_detector.predict_regime_probabilities(test_features)
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "model.pkl"
+            path = Path(tmpdir) / "model"
             fitted_detector.save(str(path))
 
             loaded = RegimeDetector.load(str(path))
@@ -485,16 +489,17 @@ class TestRegimeDetectorPersistence:
     def test_load_nonexistent_file_raises(self) -> None:
         """Test that loading nonexistent file raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError):
-            RegimeDetector.load("/nonexistent/path/model.pkl")
+            RegimeDetector.load("/nonexistent/path/model")
 
     def test_load_creates_parent_directories(
         self, fitted_detector: RegimeDetector
     ) -> None:
         """Test that save creates parent directories if needed."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "subdir" / "nested" / "model.pkl"
-            fitted_detector.save(str(path))
-            assert path.exists()
+            base_path = Path(tmpdir) / "subdir" / "nested" / "model"
+            fitted_detector.save(str(base_path))
+            # Check the joblib model file exists (indicates save succeeded)
+            assert (base_path.with_suffix(".joblib")).exists()
 
 
 class TestRegimeDetectorStateCharacteristics:

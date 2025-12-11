@@ -470,6 +470,12 @@ class RiskCalculator:
         instead of total volatility, penalizing only negative returns:
         Sortino = (R_p - R_f) / sigma_down
 
+        The downside deviation is calculated as:
+        sigma_down = sqrt((1/n) * sum((r_i - r_f)^2) for all r_i < r_f)
+
+        This formula uses ALL observations in the denominator (n), but only
+        counts squared deviations where returns fall below the target.
+
         Args:
             returns: Series of daily returns
             risk_free_rate: Annualized risk-free rate (default 0)
@@ -500,15 +506,22 @@ class RiskCalculator:
 
         mean_excess = float(excess_returns.mean())
 
-        # Downside deviation: std of returns below target (risk-free rate)
-        negative_returns = clean_returns[clean_returns < daily_rf]
+        # Downside deviation: sqrt of mean squared deviations below target
+        # Formula: sigma_down = sqrt((1/n) * sum((r_i - r_f)^2) for r_i < r_f)
+        # This uses ALL observations in denominator, but only counts deviations
+        # where return is below the target (risk-free rate)
+        returns_array = clean_returns.to_numpy()
+        downside_squared = np.where(
+            returns_array < daily_rf,
+            (returns_array - daily_rf) ** 2,
+            0.0,
+        )
+        downside_deviation = float(np.sqrt(downside_squared.mean()))
 
-        if len(negative_returns) < 2:
-            # Not enough negative returns for meaningful downside deviation
-            # This could indicate either very good performance or insufficient data
+        # Check if there are any negative returns at all
+        if (returns_array < daily_rf).sum() == 0:
+            # No returns below target - cannot compute meaningful Sortino
             return 0.0
-
-        downside_deviation = float(negative_returns.std(ddof=1))
 
         # Handle zero downside deviation edge case
         if downside_deviation < 1e-10:

@@ -1,6 +1,7 @@
 """Tests for portfolio tracker module."""
 
 import tempfile
+from collections.abc import Generator
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -17,14 +18,14 @@ from src.portfolio.tracker import PortfolioTracker
 
 
 @pytest.fixture
-def temp_db_path() -> str:
+def temp_db_path() -> Generator[str, None, None]:
     """Create a temporary database path."""
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         yield str(Path(tmpdir) / "test_portfolio.duckdb")
 
 
 @pytest.fixture
-def tracker(temp_db_path: str) -> PortfolioTracker:
+def tracker(temp_db_path: str) -> Generator[PortfolioTracker, None, None]:
     """Create a portfolio tracker with temporary database."""
     t = PortfolioTracker(temp_db_path)
     yield t
