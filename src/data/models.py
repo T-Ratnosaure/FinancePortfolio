@@ -57,12 +57,12 @@ class DailyPrice(BaseModel):
 
     symbol: ETFSymbol
     date: date
-    open: Decimal = Field(gt=0)
-    high: Decimal = Field(gt=0)
-    low: Decimal = Field(gt=0)
-    close: Decimal = Field(gt=0)
+    open: Decimal = Field(gt=Decimal("0"))
+    high: Decimal = Field(gt=Decimal("0"))
+    low: Decimal = Field(gt=Decimal("0"))
+    close: Decimal = Field(gt=Decimal("0"))
     volume: int = Field(ge=0)
-    adjusted_close: Decimal | None = Field(default=None, gt=0)
+    adjusted_close: Decimal | None = Field(default=None, gt=Decimal("0"))
 
     @model_validator(mode="after")
     def validate_price_consistency(self) -> "DailyPrice":

@@ -8,3 +8,55 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Environment and secrets (SECURITY: Prevent credential leaks)
+.env
+.env.*
+*.env
+.envrc
+secrets/
+credentials/
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+
+# API keys and tokens
+**/api_keys.json
+**/tokens.json
+**/credentials.json
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test artifacts
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# Database files (may contain sensitive data)
+*.db
+*.sqlite
+*.sqlite3
+data/*.duckdb
+
+# Log files (may contain sensitive info)
+*.log
+logs/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Model artifacts (large files)
+*.joblib
+*_arrays.npz
+
+# Windows reserved device name file (to be manually deleted)
+nul

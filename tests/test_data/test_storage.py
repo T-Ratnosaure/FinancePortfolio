@@ -1,6 +1,7 @@
 """Tests for DuckDB storage layer."""
 
 import tempfile
+from collections.abc import Generator
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -19,14 +20,14 @@ from src.data.storage.duckdb import DuckDBStorage
 
 
 @pytest.fixture
-def temp_db() -> str:
+def temp_db() -> Generator[str, None, None]:
     """Create a temporary database file path (not the file itself)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         yield str(Path(tmpdir) / "test_portfolio.duckdb")
 
 
 @pytest.fixture
-def storage(temp_db: str) -> DuckDBStorage:
+def storage(temp_db: str) -> Generator[DuckDBStorage, None, None]:
     """Create a DuckDBStorage instance with temporary database."""
     db = DuckDBStorage(temp_db)
     yield db

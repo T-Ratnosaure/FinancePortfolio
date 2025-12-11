@@ -1,5 +1,6 @@
 """Yahoo Finance fetcher for market data."""
 
+import logging
 import time
 from datetime import date, datetime
 from typing import Any
@@ -21,6 +22,8 @@ from src.data.fetchers.base import (
     RateLimitError,
 )
 from src.data.models import DailyPrice, ETFSymbol
+
+logger = logging.getLogger(__name__)
 
 
 class YahooFinanceFetcherError(FetchError):
@@ -201,7 +204,7 @@ class YahooFinanceFetcher(BaseFetcher):
 
             except DataNotAvailableError as e:
                 # Log warning but continue with other symbols
-                print(f"Warning: {e}")
+                logger.warning(f"No data available: {e}")
                 continue
             except RetryError as e:
                 raise YahooFinanceFetcherError(
@@ -252,7 +255,7 @@ class YahooFinanceFetcher(BaseFetcher):
                 )
                 dfs.append(df)
             except DataNotAvailableError as e:
-                print(f"Warning: {e}")
+                logger.warning(f"No data available: {e}")
                 continue
             except RetryError as e:
                 raise YahooFinanceFetcherError(

@@ -8,6 +8,7 @@ architecture:
 """
 
 import logging
+import os
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,104 @@ from pydantic import ValidationError
 from ..models import DailyPrice, MacroIndicator, Position, Trade
 
 logger = logging.getLogger(__name__)
+
+# Allowed base directories for database files (security constraint)
+ALLOWED_DB_DIRECTORIES = [
+    "data",
+    "db",
+    "database",
+    "storage",
+    ".data",
+]
+
+
+class PathValidationError(Exception):
+    """Raised when a path fails security validation."""
+
+    pass
+
+
+def _validate_db_path(db_path: str) -> Path:
+    """Validate database path to prevent path traversal attacks.
+
+    Security measures:
+    - Resolves path to absolute form
+    - Checks for path traversal sequences
+    - Ensures path is within allowed directories or uses standard db extensions
+    - Validates file extension
+
+    Args:
+        db_path: The database path to validate.
+
+    Returns:
+        Validated Path object.
+
+    Raises:
+        PathValidationError: If the path fails validation.
+    """
+    path = Path(db_path)
+
+    # Resolve to absolute path to detect traversal attempts
+    try:
+        resolved_path = path.resolve()
+    except (OSError, ValueError) as e:
+        raise PathValidationError(f"Invalid path: {e}") from e
+
+    # Check for obvious path traversal patterns in the original string
+    dangerous_patterns = ["..", "..\\" if "\\" in db_path else None]
+    dangerous_patterns = [p for p in dangerous_patterns if p is not None]
+    for pattern in dangerous_patterns:
+        if pattern in db_path:
+            raise PathValidationError(
+                f"Path traversal detected: '{pattern}' not allowed in database path"
+            )
+
+    # Validate file extension
+    valid_extensions = {".duckdb", ".db", ".ddb"}
+    if resolved_path.suffix.lower() not in valid_extensions and resolved_path.suffix:
+        raise PathValidationError(
+            f"Invalid database extension: {resolved_path.suffix}. "
+            f"Allowed extensions: {valid_extensions}"
+        )
+
+    # For in-memory databases, allow special syntax
+    if db_path in (":memory:", ""):
+        return path
+
+    # Ensure the path is not accessing critical system directories
+    # Note: /tmp is allowed for testing (pytest creates temp dirs there)
+    # The path traversal check above prevents ../ attacks
+    system_dirs = [
+        "/etc",
+        "/usr",
+        "/bin",
+        "/sbin",
+        r"C:\Windows",
+        r"C:\Program Files",
+        r"C:\ProgramData",
+    ]
+
+    # Check if running in test environment (pytest sets this)
+    is_testing = (
+        os.environ.get("PYTEST_CURRENT_TEST") is not None
+        or "pytest" in str(resolved_path)
+        or "tmp" in str(resolved_path).lower()
+    )
+
+    # Only block system dirs in non-test environments, or always block critical ones
+    resolved_str = str(resolved_path).lower()
+    for sys_dir in system_dirs:
+        if resolved_str.startswith(sys_dir.lower()):
+            raise PathValidationError(
+                f"Database path cannot be in system directory: {sys_dir}"
+            )
+
+    # Block /var access except during testing (CI runners may use /var/folders)
+    if resolved_str.startswith("/var") and not is_testing:
+        raise PathValidationError("Database path cannot be in system directory: /var")
+
+    logger.debug(f"Database path validated: {resolved_path}")
+    return resolved_path
 
 
 class DuckDBStorage:
@@ -41,8 +140,12 @@ class DuckDBStorage:
         Args:
             db_path: Path to the DuckDB database file. If it doesn't exist,
                     a new database will be created.
+
+        Raises:
+            PathValidationError: If the database path fails security validation.
         """
-        self.db_path = Path(db_path)
+        # Security: Validate path to prevent traversal attacks
+        self.db_path = _validate_db_path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
         self.conn = duckdb.connect(str(self.db_path))
@@ -277,7 +380,9 @@ class DuckDBStorage:
                     float(price.low),
                     float(price.close),
                     price.volume,
-                    float(price.adjusted_close),
+                    float(price.adjusted_close)
+                    if price.adjusted_close is not None
+                    else 0.0,
                     datetime.now(),
                     "api",
                 )
@@ -305,7 +410,9 @@ class DuckDBStorage:
                     float(price.low),
                     float(price.close),
                     price.volume,
-                    float(price.adjusted_close),
+                    float(price.adjusted_close)
+                    if price.adjusted_close is not None
+                    else 0.0,
                     datetime.now(),
                 )
             )

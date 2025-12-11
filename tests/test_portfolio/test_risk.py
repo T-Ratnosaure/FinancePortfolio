@@ -132,7 +132,7 @@ class TestVaR:
     ) -> None:
         """Test invalid method raises error."""
         with pytest.raises(ValueError, match="Method must be"):
-            risk_calc.calculate_var(sample_returns, method="invalid")
+            risk_calc.calculate_var(sample_returns, method="invalid")  # type: ignore[arg-type]
 
 
 class TestPortfolioVolatility:
@@ -314,7 +314,7 @@ class TestLeveragedDecay:
         index_returns = pd.Series(0.0005 + 0.01 * np.random.randn(100), index=dates)
 
         # ETF returns (simulating 2x with some decay)
-        etf_returns = 2 * index_returns - 0.0002  # Some daily decay
+        etf_returns = index_returns.mul(2.0) - 0.0002  # Some daily decay
 
         decay = risk_calc.calculate_leveraged_decay(etf_returns, index_returns)
 
@@ -343,9 +343,9 @@ class TestBeta:
         # Create correlated returns simulating leveraged relationship
         benchmark_returns = pd.Series(0.0005 + 0.01 * np.random.randn(100), index=dates)
         # Portfolio has 2x the benchmark movement + noise
-        portfolio_returns = 2 * benchmark_returns + 0.002 * np.random.randn(100)
+        portfolio_returns = benchmark_returns.mul(2.0) + 0.002 * np.random.randn(100)
 
-        beta = risk_calc.calculate_beta(portfolio_returns, benchmark_returns)
+        beta = risk_calc.calculate_beta(pd.Series(portfolio_returns), benchmark_returns)
 
         # Beta should be close to 2.0 (leveraged relationship)
         assert isinstance(beta, float)
@@ -368,7 +368,8 @@ class TestCorrelationMatrix:
 
         # Diagonal should be 1.0
         for col in corr.columns:
-            assert abs(corr.loc[col, col] - 1.0) < 0.001
+            diag_val = corr.loc[col, col]
+            assert abs(float(diag_val) - 1.0) < 0.001  # type: ignore[arg-type]
 
     def test_calculate_correlation_matrix_insufficient_columns(
         self, risk_calc: RiskCalculator
