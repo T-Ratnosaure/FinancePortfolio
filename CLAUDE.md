@@ -318,3 +318,82 @@ User asks about portfolio optimization:
    - Follow existing patterns
    - Document public APIs
    - Test thoroughly
+
+---
+
+## ⛔ LESSONS LEARNED - NEVER DO THIS AGAIN ⛔
+
+**These are mistakes made during development. Learn from them and NEVER repeat.**
+
+### Security Anti-Patterns (Sprint 4 Discoveries)
+
+1. **NEVER use `pickle` for serialization**
+   - Pickle allows arbitrary code execution on load (CVSS 9.8 - CRITICAL)
+   - Use `joblib` for ML models + JSON for config data
+   - If you must serialize complex objects, use Protocol Buffers or safe alternatives
+   - **Bad**: `pickle.load(open(file, 'rb'))`
+   - **Good**: `joblib.load(file)` with JSON metadata
+
+2. **NEVER forget `.env` in `.gitignore`**
+   - API keys, secrets, credentials WILL be exposed
+   - Add these patterns to `.gitignore` IMMEDIATELY on project creation:
+     ```
+     .env
+     .env.*
+     *.key
+     *.pem
+     secrets/
+     credentials/
+     ```
+
+3. **NEVER trust user-provided file paths**
+   - Always validate paths to prevent directory traversal attacks
+   - Block system directories (`/etc`, `/usr`, `C:\Windows`, etc.)
+   - Validate file extensions for sensitive operations
+
+### Code Quality Anti-Patterns
+
+4. **NEVER reference non-existent code in examples**
+   - Sprint 4 had broken examples referencing `ETFSymbol.SPY` and `ETFSymbol.AGG` which didn't exist
+   - Examples should be TESTED and WORKING
+   - Run example scripts as part of CI or manual verification
+
+5. **NEVER skip formatting before pushing**
+   - Always run `uv run ruff format .` before committing
+   - CI will fail on formatting issues
+   - Amending commits wastes time and clutters history
+
+6. **NEVER block `/tmp` in path validation for libraries**
+   - pytest and other tools use `/tmp` for temporary files on Linux
+   - CI runs on Linux and will fail if `/tmp` is blocked
+   - Use environment detection (`PYTEST_CURRENT_TEST`) for test-aware validation
+
+### Mathematical Anti-Patterns
+
+7. **NEVER implement financial formulas without verification**
+   - Sprint 4 discovered wrong Sortino ratio formula
+   - **Wrong**: `std(negative_returns_only)`
+   - **Correct**: `sqrt(mean((returns - target)^2 where returns < target))`
+   - Always verify formulas against authoritative sources (CFA curriculum, academic papers)
+
+### Process Anti-Patterns
+
+8. **NEVER skip multi-team reviews**
+   - Sprint 3 was merged without thorough security/quality review
+   - Result: Critical vulnerabilities discovered post-merge
+   - Always launch review agents BEFORE creating PR:
+     - `cybersecurity-expert-maxime` for security
+     - `quality-control-enforcer` for code quality
+     - `research-remy-stocks` or `portfolio-manager-jean-yves` for financial math
+
+9. **NEVER let supporting code quality slip**
+   - Core modules (`src/`) were excellent
+   - Supporting code (`examples/`, `main.py`) was broken
+   - ALL code should meet the same quality standards
+
+### CI/CD Anti-Patterns
+
+10. **NEVER assume local tests = CI success**
+    - Windows paths differ from Linux paths
+    - Temp directories are in different locations
+    - Always check CI logs when it fails, don't guess
