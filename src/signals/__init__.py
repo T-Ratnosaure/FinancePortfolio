@@ -13,11 +13,16 @@ from src.signals.features import (
     InsufficientDataError,
 )
 from src.signals.regime import (
+    ABSOLUTE_MIN_SAMPLES,
+    MIN_SAMPLES_PER_PARAMETER,
     FeatureDimensionError,
+    InsufficientSamplesError,
     NotFittedError,
     RegimeDetector,
     RegimeDetectorConfig,
     RegimeDetectorError,
+    calculate_hmm_parameters,
+    calculate_min_samples,
 )
 
 __all__ = [
@@ -32,6 +37,11 @@ __all__ = [
     "RegimeDetectorError",
     "NotFittedError",
     "FeatureDimensionError",
+    "InsufficientSamplesError",
+    "calculate_hmm_parameters",
+    "calculate_min_samples",
+    "MIN_SAMPLES_PER_PARAMETER",
+    "ABSOLUTE_MIN_SAMPLES",
     # Allocation
     "AllocationOptimizer",
     "RiskLimits",

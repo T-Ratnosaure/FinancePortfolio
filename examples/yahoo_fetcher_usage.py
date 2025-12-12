@@ -37,11 +37,13 @@ def main() -> None:
     except Exception as e:
         print(f"Error: {e}")
 
-    # Example 2: Fetch US ETF prices using strings
-    us_symbols = ["SPY", "AGG"]
+    # Example 2: Fetch using ETFSymbol enum values directly
+    from src.data.models import ETFSymbol
+
+    enum_symbols: list[ETFSymbol | str] = [ETFSymbol.CL2, ETFSymbol.WPEA]
     try:
-        prices = fetcher.fetch_etf_prices(us_symbols, start_date, end_date)
-        print(f"Fetched {len(prices)} price records")
+        prices = fetcher.fetch_etf_prices(enum_symbols, start_date, end_date)
+        print(f"Fetched {len(prices)} price records using enum symbols")
     except Exception as e:
         print(f"Error: {e}")
 
@@ -66,8 +68,8 @@ def main() -> None:
     except Exception as e:
         print(f"Error: {e}")
 
-    # Example 5: Batch download
-    batch_symbols = ["SPY", "QQQ", "IWM"]
+    # Example 5: Batch download of multiple PEA ETFs
+    batch_symbols = ["LQQ.PA", "CL2.PA", "WPEA.PA"]
     try:
         batch_df = fetcher.fetch_multiple_symbols(batch_symbols, start_date, end_date)
         print(f"Batch download complete: {len(batch_df)} records")
@@ -75,7 +77,7 @@ def main() -> None:
             symbols = list(batch_df.columns.get_level_values(0).unique())
         else:
             symbols = list(batch_df.columns)
-        print(f"Symbols: {symbols}")
+        print(f"PEA ETFs downloaded: {symbols}")
     except Exception as e:
         print(f"Error: {e}")
 

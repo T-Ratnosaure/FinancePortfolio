@@ -1,4 +1,4 @@
-# FinancePortfolio - PEA Portfolio Optimization System
+cl# FinancePortfolio - PEA Portfolio Optimization System
 
 An AI-driven portfolio management system for French PEA (Plan d'Epargne en Actions) accounts, leveraging Hidden Markov Model regime detection and risk-optimized allocation strategies.
 

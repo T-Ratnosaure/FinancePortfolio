@@ -36,6 +36,138 @@ MODEL_FILE_SUFFIX = ".joblib"
 CONFIG_FILE_SUFFIX = "_config.json"
 ARRAYS_FILE_SUFFIX = "_arrays.npz"
 
+# Constants for minimum sample size validation
+# Rule of thumb: at least 10 samples per estimated parameter for reliable estimation
+# More conservative approaches suggest 100 samples per parameter
+MIN_SAMPLES_PER_PARAMETER = 10
+# Absolute minimum regardless of parameter count (roughly 5 years of daily data)
+ABSOLUTE_MIN_SAMPLES = 1260
+# Default expected number of features for financial regime detection
+DEFAULT_EXPECTED_FEATURES = 9
+
+
+def calculate_hmm_parameters(
+    n_states: int, n_features: int, covariance_type: str
+) -> int:
+    """Calculate the number of free parameters in a Gaussian HMM.
+
+    This function computes the total number of parameters that need to be
+    estimated during HMM fitting, which is essential for determining the
+    minimum sample size required for reliable estimation.
+
+    Args:
+        n_states: Number of hidden states in the HMM.
+        n_features: Number of observation features.
+        covariance_type: Type of covariance matrix.
+            Options: 'spherical', 'diag', 'full', 'tied'.
+
+    Returns:
+        Total number of free parameters to estimate.
+
+    Mathematical breakdown:
+        - Initial distribution: (n_states - 1) free parameters
+        - Transition matrix: n_states * (n_states - 1) free parameters
+        - Means: n_states * n_features parameters
+        - Covariance (depends on type):
+            - spherical: n_states * 1 (single variance per state)
+            - diag: n_states * n_features (diagonal variances)
+            - full: n_states * n_features * (n_features + 1) / 2
+            - tied: n_features * (n_features + 1) / 2 (shared across states)
+    """
+    # Initial state distribution (n_states - 1 free parameters)
+    n_init_params = n_states - 1
+
+    # Transition matrix (each row sums to 1, so n_states - 1 free per row)
+    n_trans_params = n_states * (n_states - 1)
+
+    # Mean vectors
+    n_mean_params = n_states * n_features
+
+    # Covariance parameters depend on covariance type
+    if covariance_type == "spherical":
+        # Single variance per state
+        n_cov_params = n_states
+    elif covariance_type == "diag":
+        # Diagonal covariance: n_features variances per state
+        n_cov_params = n_states * n_features
+    elif covariance_type == "full":
+        # Full covariance: symmetric matrix has n*(n+1)/2 unique elements
+        cov_per_state = n_features * (n_features + 1) // 2
+        n_cov_params = n_states * cov_per_state
+    elif covariance_type == "tied":
+        # Single covariance matrix shared across all states
+        n_cov_params = n_features * (n_features + 1) // 2
+    else:
+        # Default to full covariance estimate (most conservative)
+        cov_per_state = n_features * (n_features + 1) // 2
+        n_cov_params = n_states * cov_per_state
+
+    total_params = n_init_params + n_trans_params + n_mean_params + n_cov_params
+
+    return total_params
+
+
+def calculate_min_samples(
+    n_states: int,
+    n_features: int,
+    covariance_type: str,
+    samples_per_parameter: int = MIN_SAMPLES_PER_PARAMETER,
+) -> int:
+    """Calculate the minimum number of samples required for reliable HMM fitting.
+
+    This function determines the minimum sample size based on:
+    1. The number of parameters to estimate (function of states, features, cov type)
+    2. A rule of thumb for samples per parameter (default: 10, conservative: 100)
+    3. An absolute minimum floor (roughly 5 years of daily financial data)
+
+    For financial regime detection with:
+    - 3 states (RISK_ON, NEUTRAL, RISK_OFF)
+    - 9 features (typical macro indicators)
+    - Full covariance
+
+    The calculation yields:
+    - Parameters: ~170
+    - Minimum at 10x: 1,700 samples (approximately 7 years of daily data)
+
+    Args:
+        n_states: Number of hidden states.
+        n_features: Number of observation features.
+        covariance_type: Type of covariance matrix.
+        samples_per_parameter: Multiplier for sample size.
+            Default 10, conservative approaches use 100.
+
+    Returns:
+        Minimum number of samples required.
+
+    References:
+        - Bishop, C. M. (2006). Pattern Recognition and Machine Learning.
+        - Hamilton, J. D. (1994). Time Series Analysis. (Chapter 22 on HMMs)
+        - Rule of thumb: "At least 10-100 observations per parameter"
+    """
+    n_params = calculate_hmm_parameters(n_states, n_features, covariance_type)
+    param_based_min = n_params * samples_per_parameter
+
+    # Return the maximum of parameter-based minimum and absolute minimum
+    return max(param_based_min, ABSOLUTE_MIN_SAMPLES)
+
+
+class InsufficientSamplesError(Exception):
+    """Raised when training data has insufficient samples for reliable HMM fitting.
+
+    This error indicates that the provided training data does not have enough
+    observations to reliably estimate all HMM parameters. Training with
+    insufficient data leads to:
+    - Overfitting to noise
+    - Unreliable regime classifications
+    - Poor generalization to new data
+    - Unstable transition probability estimates
+
+    The error message includes the required minimum sample size and guidance
+    on how to obtain sufficient data.
+    """
+
+    pass
+
 
 class RegimeDetectorConfig(BaseModel):
     """Configuration for the HMM regime detector.
@@ -187,7 +319,9 @@ class RegimeDetector:
 
         return features
 
-    def fit(self, features: np.ndarray) -> "RegimeDetector":
+    def fit(
+        self, features: np.ndarray, *, skip_sample_validation: bool = False
+    ) -> "RegimeDetector":
         """Fit the HMM on historical feature data.
 
         Trains the Gaussian HMM on the provided features and then maps
@@ -200,17 +334,38 @@ class RegimeDetector:
         - RISK_OFF: State with highest mean of first feature
         - NEUTRAL: Remaining state(s)
 
+        IMPORTANT: Minimum Sample Size Requirements
+        ------------------------------------------
+        For reliable HMM estimation, you need approximately 10 samples per
+        parameter. For financial regime detection with:
+        - 3 states (RISK_ON, NEUTRAL, RISK_OFF)
+        - 9 features (typical macro indicators)
+        - Full covariance matrix
+
+        This requires approximately 1,700+ samples (about 7 years of daily data).
+
+        Training with insufficient data leads to:
+        - Overfitting to noise
+        - Unreliable regime classifications
+        - Spurious transition probabilities
+        - Poor out-of-sample performance
+
         Args:
             features: Training features array of shape (n_samples, n_features).
                 Rows should be temporally ordered (oldest first).
                 Expected features: VIX or volatility measure, trend indicator,
                 credit spreads or similar risk measure.
+            skip_sample_validation: If True, skip minimum sample size validation.
+                USE WITH EXTREME CAUTION - only for testing or when you fully
+                understand the statistical implications. Default is False.
 
         Returns:
             Self for method chaining.
 
         Raises:
-            ValueError: If features array is empty or has insufficient samples.
+            ValueError: If features array is empty.
+            InsufficientSamplesError: If features array has insufficient samples
+                for reliable HMM fitting (unless skip_sample_validation=True).
         """
         # Validate input
         if features.size == 0:
@@ -221,12 +376,51 @@ class RegimeDetector:
 
         n_samples, n_features = features.shape
 
-        # Require at least 3x n_states samples for meaningful fitting
-        min_samples = self.n_states * 3
-        if n_samples < min_samples:
-            raise ValueError(
-                f"Insufficient training samples. Received {n_samples}, "
-                f"but need at least {min_samples} for {self.n_states} states."
+        # Calculate minimum required samples based on model complexity
+        min_samples = calculate_min_samples(
+            n_states=self.n_states,
+            n_features=n_features,
+            covariance_type=self.config.covariance_type,
+        )
+        n_params = calculate_hmm_parameters(
+            n_states=self.n_states,
+            n_features=n_features,
+            covariance_type=self.config.covariance_type,
+        )
+
+        if n_samples < min_samples and not skip_sample_validation:
+            # Calculate approximately how many years of daily data is needed
+            trading_days_per_year = 252
+            years_needed = min_samples / trading_days_per_year
+
+            raise InsufficientSamplesError(
+                f"Insufficient training samples for reliable HMM fitting.\n\n"
+                f"Received: {n_samples:,} samples\n"
+                f"Required: {min_samples:,} samples minimum\n\n"
+                f"Model complexity:\n"
+                f"  - Hidden states: {self.n_states}\n"
+                f"  - Features: {n_features}\n"
+                f"  - Covariance type: {self.config.covariance_type}\n"
+                f"  - Parameters to estimate: {n_params:,}\n\n"
+                f"Recommendation:\n"
+                f"  Obtain at least {years_needed:.1f} years of daily financial data "
+                f"({min_samples:,} observations).\n\n"
+                f"Why this matters:\n"
+                f"  - HMM parameter estimation requires sufficient data\n"
+                f"  - Rule of thumb: at least 10 samples per parameter\n"
+                f"  - For financial regime detection: 7+ years of data\n\n"
+                f"If you must proceed with limited data (NOT RECOMMENDED):\n"
+                f"  - Use skip_sample_validation=True (at your own risk)\n"
+                f"  - Consider reducing model complexity:\n"
+                f"    * Use fewer features\n"
+                f"    * Use 'diag' or 'spherical' covariance_type\n"
+                f"    * Reduce number of states"
+            )
+        elif n_samples < min_samples and skip_sample_validation:
+            logger.warning(
+                f"Training HMM with insufficient samples "
+                f"({n_samples:,} < {min_samples:,}). "
+                f"Model may be unreliable. Overfitting likely."
             )
 
         self._n_features = n_features

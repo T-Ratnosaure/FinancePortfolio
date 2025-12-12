@@ -261,7 +261,8 @@ class RiskCalculator:
             weight_vector = weight_vector / non_cash_weight
 
         # Calculate covariance matrix
-        cov_matrix = asset_returns.cov().values
+        cov_df: pd.DataFrame = asset_returns.cov()  # type: ignore[assignment]
+        cov_matrix = cov_df.to_numpy()
 
         # Portfolio variance: w' * Cov * w
         portfolio_variance = float(weight_vector @ cov_matrix @ weight_vector)
@@ -373,8 +374,8 @@ class RiskCalculator:
         if n_obs > self.lookback_days:
             aligned = aligned.iloc[-self.lookback_days :]
 
-        etf_rets: pd.Series = aligned["etf"]
-        idx_rets: pd.Series = aligned["index"]
+        etf_rets = pd.Series(aligned["etf"])
+        idx_rets = pd.Series(aligned["index"])
 
         # Calculate actual cumulative returns
         etf_prod = (1 + etf_rets).prod()
@@ -570,8 +571,8 @@ class RiskCalculator:
         if n_obs > self.lookback_days:
             aligned = aligned.iloc[-self.lookback_days :]
 
-        port_rets: pd.Series = aligned["portfolio"]
-        bench_rets: pd.Series = aligned["benchmark"]
+        port_rets = pd.Series(aligned["portfolio"])
+        bench_rets = pd.Series(aligned["benchmark"])
 
         # Calculate covariance and variance
         covariance = float(port_rets.cov(bench_rets))
@@ -806,7 +807,7 @@ class RiskCalculator:
         if wpea_symbol not in returns_df.columns:
             return leveraged_decay
 
-        index_rets = returns_df[wpea_symbol]
+        index_rets = pd.Series(returns_df[wpea_symbol])
 
         for etf_symbol in [ETFSymbol.LQQ, ETFSymbol.CL2]:
             symbol_str = etf_symbol.value
@@ -818,7 +819,7 @@ class RiskCalculator:
             try:
                 etf_info = PEA_ETFS.get(etf_symbol)
                 leverage = etf_info.leverage if etf_info else 2
-                etf_rets = returns_df[symbol_str]
+                etf_rets = pd.Series(returns_df[symbol_str])
                 decay = self.calculate_leveraged_decay(etf_rets, index_rets, leverage)
                 leveraged_decay[symbol_str] = decay
             except (InsufficientDataError, ValueError):

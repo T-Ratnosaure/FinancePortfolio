@@ -16,7 +16,16 @@ from typing import Any
 import duckdb
 from pydantic import ValidationError
 
-from ..models import DailyPrice, MacroIndicator, Position, Trade
+from ..models import (
+    DailyPrice,
+    DataCategory,
+    DataFreshness,
+    FreshnessStatus,
+    MacroIndicator,
+    Position,
+    StaleDataError,
+    Trade,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +232,26 @@ class DuckDBStorage:
             )
         """)
 
+        # Data freshness tracking table
+        self.conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS raw.seq_data_freshness_id
+            START 1
+        """)
+
+        self.conn.execute("""
+            CREATE TABLE IF NOT EXISTS raw.data_freshness (
+                id INTEGER PRIMARY KEY DEFAULT nextval('raw.seq_data_freshness_id'),
+                data_category VARCHAR NOT NULL,
+                symbol VARCHAR,
+                indicator_name VARCHAR,
+                last_updated TIMESTAMP NOT NULL,
+                record_count INTEGER NOT NULL,
+                source VARCHAR NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(data_category, symbol, indicator_name, source)
+            )
+        """)
+
         # Cleaned layer tables
         self.conn.execute("""
             CREATE TABLE IF NOT EXISTS cleaned.etf_prices_daily (
@@ -344,6 +373,10 @@ class DuckDBStorage:
             "ON analytics.trade_signals(date)",
             "CREATE INDEX IF NOT EXISTS idx_positions_symbol "
             "ON analytics.portfolio_positions(symbol)",
+            "CREATE INDEX IF NOT EXISTS idx_data_freshness_category "
+            "ON raw.data_freshness(data_category)",
+            "CREATE INDEX IF NOT EXISTS idx_data_freshness_symbol "
+            "ON raw.data_freshness(symbol)",
         ]
 
         for index_sql in indexes:
@@ -428,6 +461,17 @@ class DuckDBStorage:
         )
 
         logger.info(f"Inserted {len(prices)} price records")
+
+        # Update freshness tracking for each symbol
+        for symbol in {price.symbol for price in prices}:
+            symbol_prices = [p for p in prices if p.symbol == symbol]
+            self._update_freshness(
+                data_category=DataCategory.PRICE_DATA,
+                symbol=symbol.value,
+                record_count=len(symbol_prices),
+                source="api",
+            )
+
         return len(prices)
 
     def insert_macro(self, indicators: list[MacroIndicator]) -> int:
@@ -491,6 +535,21 @@ class DuckDBStorage:
         )
 
         logger.info(f"Inserted {len(indicators)} macro indicator records")
+
+        # Update freshness tracking for each indicator
+        for indicator_name in {ind.indicator_name for ind in indicators}:
+            indicator_records = [
+                ind for ind in indicators if ind.indicator_name == indicator_name
+            ]
+            if indicator_records:
+                source = indicator_records[0].source
+                self._update_freshness(
+                    data_category=DataCategory.MACRO_DATA,
+                    indicator_name=indicator_name,
+                    record_count=len(indicator_records),
+                    source=source,
+                )
+
         return len(indicators)
 
     def get_prices(
@@ -613,6 +672,14 @@ class DuckDBStorage:
         )
 
         logger.info(f"Inserted position for {position.symbol.value}")
+
+        # Update freshness tracking for portfolio positions
+        self._update_freshness(
+            data_category=DataCategory.PORTFOLIO_DATA,
+            symbol=position.symbol.value,
+            record_count=1,
+            source="manual",
+        )
 
     def get_positions(self) -> list[Position]:
         """Get current portfolio positions.
@@ -749,6 +816,170 @@ class DuckDBStorage:
                 logger.error(f"Validation error for trade {row}: {e}")
 
         return trades
+
+    def _update_freshness(
+        self,
+        data_category: DataCategory,
+        record_count: int,
+        source: str,
+        symbol: str | None = None,
+        indicator_name: str | None = None,
+    ) -> None:
+        """Update data freshness metadata.
+
+        Args:
+            data_category: Category of data being updated
+            record_count: Number of records in this update
+            source: Data source name
+            symbol: Optional symbol for price/position data
+            indicator_name: Optional indicator name for macro data
+        """
+        now = datetime.now()
+
+        # Use INSERT ... ON CONFLICT with explicit conflict target
+        self.conn.execute(
+            """
+            INSERT INTO raw.data_freshness
+            (data_category, symbol, indicator_name, last_updated,
+             record_count, source, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (data_category, symbol, indicator_name, source)
+            DO UPDATE SET
+                last_updated = EXCLUDED.last_updated,
+                record_count = EXCLUDED.record_count,
+                updated_at = EXCLUDED.updated_at
+        """,
+            [
+                data_category.value,
+                symbol,
+                indicator_name,
+                now,
+                record_count,
+                source,
+                now,
+            ],
+        )
+
+    def get_freshness(
+        self,
+        data_category: DataCategory,
+        symbol: str | None = None,
+        indicator_name: str | None = None,
+    ) -> DataFreshness | None:
+        """Get data freshness metadata.
+
+        Args:
+            data_category: Category of data to check
+            symbol: Optional symbol filter
+            indicator_name: Optional indicator name filter
+
+        Returns:
+            DataFreshness object if found, None otherwise
+        """
+        sql = """
+            SELECT data_category, symbol, indicator_name, last_updated,
+                   record_count, source
+            FROM raw.data_freshness
+            WHERE data_category = ?
+        """
+        params: list[Any] = [data_category.value]
+
+        if symbol is not None:
+            sql += " AND symbol = ?"
+            params.append(symbol)
+
+        if indicator_name is not None:
+            sql += " AND indicator_name = ?"
+            params.append(indicator_name)
+
+        sql += " ORDER BY last_updated DESC LIMIT 1"
+
+        result = self.conn.execute(sql, params).fetchone()
+
+        if not result:
+            return None
+
+        return DataFreshness(
+            data_category=DataCategory(result[0]),
+            symbol=result[1],
+            indicator_name=result[2],
+            last_updated=result[3],
+            record_count=result[4],
+            source=result[5],
+        )
+
+    def check_freshness(
+        self,
+        data_category: DataCategory,
+        symbol: str | None = None,
+        indicator_name: str | None = None,
+        raise_on_critical: bool = True,
+    ) -> DataFreshness | None:
+        """Check data freshness and log warnings.
+
+        Args:
+            data_category: Category of data to check
+            symbol: Optional symbol filter
+            indicator_name: Optional indicator name filter
+            raise_on_critical: If True, raise StaleDataError for critical staleness
+
+        Returns:
+            DataFreshness object if found, None otherwise
+
+        Raises:
+            StaleDataError: If data is critically stale and raise_on_critical=True
+        """
+        freshness = self.get_freshness(data_category, symbol, indicator_name)
+
+        if not freshness:
+            logger.warning(f"No freshness metadata found for {data_category.value}")
+            return None
+
+        status = freshness.get_status()
+
+        if status == FreshnessStatus.CRITICAL:
+            warning = freshness.get_warning_message()
+            logger.error(warning)
+            if raise_on_critical:
+                raise StaleDataError(freshness)
+        elif status == FreshnessStatus.STALE:
+            warning = freshness.get_warning_message()
+            logger.warning(warning)
+
+        return freshness
+
+    def get_all_freshness_status(self) -> list[DataFreshness]:
+        """Get freshness status for all tracked data.
+
+        Returns:
+            List of DataFreshness objects for all tracked datasets
+        """
+        result = self.conn.execute(
+            """
+            SELECT data_category, symbol, indicator_name, last_updated,
+                   record_count, source
+            FROM raw.data_freshness
+            ORDER BY data_category, symbol, indicator_name
+        """
+        ).fetchall()
+
+        freshness_list = []
+        for row in result:
+            try:
+                freshness_list.append(
+                    DataFreshness(
+                        data_category=DataCategory(row[0]),
+                        symbol=row[1],
+                        indicator_name=row[2],
+                        last_updated=row[3],
+                        record_count=row[4],
+                        source=row[5],
+                    )
+                )
+            except Exception as e:
+                logger.error(f"Failed to parse freshness record {row}: {e}")
+
+        return freshness_list
 
     def close(self) -> None:
         """Close the database connection."""
