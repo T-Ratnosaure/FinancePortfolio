@@ -1,7 +1,8 @@
 """Paper Trading Session Manager.
 
 This module provides the main orchestrator for paper trading sessions,
-coordinating portfolio management, order execution, and performance tracking.
+coordinating portfolio management, order execution, performance tracking,
+and pre-trade risk validation.
 """
 
 from datetime import date, datetime
@@ -28,6 +29,7 @@ from src.paper_trading.models import (
 from src.paper_trading.performance import PerformanceTracker
 from src.paper_trading.portfolio_state import PortfolioStateManager
 from src.paper_trading.storage import PaperTradingStorage
+from src.portfolio.pretrade import PreTradeValidatorConfig
 
 
 class SessionNotFoundError(Exception):
@@ -80,6 +82,8 @@ class PaperTradingSession:
         db_path: str | Path = "data/portfolio.duckdb",
         cost_model: TransactionCostModel | None = None,
         fill_config: FillSimulationConfig | None = None,
+        pretrade_config: PreTradeValidatorConfig | None = None,
+        enable_pretrade_validation: bool = True,
     ) -> None:
         """Initialize paper trading session.
 
@@ -89,13 +93,24 @@ class PaperTradingSession:
             db_path: Path to DuckDB database.
             cost_model: Transaction cost model (default if None).
             fill_config: Fill simulation configuration.
+            pretrade_config: Pre-trade risk validation configuration.
+                Uses defaults (25% position limit, 30% leveraged limit,
+                10% cash buffer) if None.
+            enable_pretrade_validation: Whether to enable pre-trade risk
+                validation. Defaults to True for safety.
         """
         self.config = config
         self.session_id = session_id or str(uuid4())
         self.db_path = Path(db_path)
+        self.enable_pretrade_validation = enable_pretrade_validation
 
         self.storage = PaperTradingStorage(self.db_path)
-        self.executor = VirtualOrderExecutor(cost_model, fill_config)
+        self.executor = VirtualOrderExecutor(
+            cost_model=cost_model,
+            fill_config=fill_config,
+            pretrade_config=pretrade_config,
+            enable_pretrade_validation=enable_pretrade_validation,
+        )
 
         self._status = SessionStatus.ACTIVE
         self._started_at: datetime | None = None
@@ -107,17 +122,26 @@ class PaperTradingSession:
         cls,
         config: SessionConfig,
         db_path: str | Path = "data/portfolio.duckdb",
+        pretrade_config: PreTradeValidatorConfig | None = None,
+        enable_pretrade_validation: bool = True,
     ) -> "PaperTradingSession":
         """Create and start a new paper trading session.
 
         Args:
             config: Session configuration.
             db_path: Path to DuckDB database.
+            pretrade_config: Pre-trade risk validation configuration.
+            enable_pretrade_validation: Whether to enable pre-trade validation.
 
         Returns:
             Started paper trading session.
         """
-        session = cls(config, db_path=db_path)
+        session = cls(
+            config,
+            db_path=db_path,
+            pretrade_config=pretrade_config,
+            enable_pretrade_validation=enable_pretrade_validation,
+        )
         session.start()
         return session
 
@@ -289,6 +313,52 @@ class PaperTradingSession:
             self._performance_tracker.record_trade(trade)
 
         return result, trade
+
+    def validate_order_pretrade(
+        self,
+        symbol: str,
+        action: OrderAction,
+        quantity: Decimal,
+        current_price: Decimal,
+        order_type: OrderType = OrderType.MARKET,
+    ) -> tuple[bool, list[str], list[str]]:
+        """Validate an order against pre-trade risk limits without executing.
+
+        Useful for previewing whether an order would pass risk validation
+        before committing to execution.
+
+        Args:
+            symbol: ETF symbol (e.g., "LQQ.PA").
+            action: Buy or sell.
+            quantity: Number of shares.
+            current_price: Current market price.
+            order_type: Market or limit order.
+
+        Returns:
+            Tuple of (is_valid, warnings, errors) where:
+                - is_valid: True if order passes all risk checks
+                - warnings: Non-blocking warnings (order can proceed)
+                - errors: Blocking errors (order would be rejected)
+        """
+        if not self.enable_pretrade_validation:
+            return True, [], []
+
+        if self._portfolio_manager is None:
+            return False, [], ["Session not properly initialized"]
+
+        order = PaperOrder(
+            session_id=self.session_id,
+            symbol=symbol,
+            action=action,
+            order_type=order_type,
+            quantity=quantity,
+        )
+
+        result = self.executor._validate_pretrade_risk(
+            order, current_price, self._portfolio_manager
+        )
+
+        return result.is_valid, result.warnings, result.errors
 
     def update_prices(self, prices: dict[str, Decimal]) -> None:
         """Update current prices for all positions.

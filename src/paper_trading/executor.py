@@ -1,7 +1,7 @@
 """Virtual Order Executor for Paper Trading Engine.
 
 This module simulates order execution with realistic fills, including
-slippage modeling and transaction cost calculation.
+slippage modeling, transaction cost calculation, and pre-trade risk validation.
 """
 
 import random
@@ -20,28 +20,50 @@ from src.paper_trading.models import (
     TradeRecord,
 )
 from src.paper_trading.portfolio_state import PortfolioStateManager
+from src.portfolio.pretrade import (
+    Order as PreTradeOrder,
+    OrderAction as PreTradeOrderAction,
+    OrderType as PreTradeOrderType,
+    Portfolio as PreTradePortfolio,
+    PreTradeValidator,
+    PreTradeValidatorConfig,
+    ValidationResult,
+)
 
 
 class VirtualOrderExecutor:
     """Simulates order execution with realistic market behavior.
 
-    Uses the existing TransactionCostModel for cost calculations
-    and adds slippage simulation based on market conditions.
+    Uses the existing TransactionCostModel for cost calculations,
+    adds slippage simulation based on market conditions, and
+    performs pre-trade risk validation before execution.
     """
 
     def __init__(
         self,
         cost_model: TransactionCostModel | None = None,
         fill_config: FillSimulationConfig | None = None,
+        pretrade_validator: PreTradeValidator | None = None,
+        pretrade_config: PreTradeValidatorConfig | None = None,
+        enable_pretrade_validation: bool = True,
     ) -> None:
         """Initialize the virtual order executor.
 
         Args:
             cost_model: Transaction cost model (uses default if None).
             fill_config: Fill simulation configuration.
+            pretrade_validator: Pre-trade risk validator (creates default if None).
+            pretrade_config: Configuration for pre-trade validation.
+            enable_pretrade_validation: Whether to enable pre-trade validation.
         """
         self.cost_model = cost_model or TransactionCostModel()
         self.fill_config = fill_config or FillSimulationConfig()
+        self.enable_pretrade_validation = enable_pretrade_validation
+
+        if pretrade_validator is not None:
+            self.pretrade_validator = pretrade_validator
+        else:
+            self.pretrade_validator = PreTradeValidator(config=pretrade_config)
 
     def execute_order(
         self,
@@ -52,6 +74,10 @@ class VirtualOrderExecutor:
     ) -> tuple[OrderResult, TradeRecord | None]:
         """Execute an order with simulated fill.
 
+        Performs pre-trade risk validation before execution to ensure
+        the order complies with position limits, leveraged exposure limits,
+        and cash buffer requirements.
+
         Args:
             order: Order to execute.
             current_price: Current market price.
@@ -61,6 +87,26 @@ class VirtualOrderExecutor:
         Returns:
             Tuple of (OrderResult, TradeRecord or None if rejected).
         """
+        # Pre-trade risk validation
+        if self.enable_pretrade_validation:
+            pretrade_result = self._validate_pretrade_risk(
+                order, current_price, portfolio_manager
+            )
+            if not pretrade_result.is_valid:
+                # Aggregate all errors into rejection reason
+                rejection_reason = "; ".join(pretrade_result.errors)
+                return (
+                    OrderResult(
+                        order_id=order.order_id,
+                        status=OrderStatus.REJECTED,
+                        rejection_reason=(
+                            f"Pre-trade validation failed: {rejection_reason}"
+                        ),
+                    ),
+                    None,
+                )
+
+        # Basic order validation (funds/shares check)
         validation_error = portfolio_manager.validate_order(order, current_price)
         if validation_error:
             return (
@@ -160,6 +206,91 @@ class VirtualOrderExecutor:
         )
 
         return result, trade
+
+    def _validate_pretrade_risk(
+        self,
+        order: PaperOrder,
+        current_price: Decimal,
+        portfolio_manager: PortfolioStateManager,
+    ) -> ValidationResult:
+        """Perform pre-trade risk validation for an order.
+
+        Converts the paper trading order and portfolio state to formats
+        compatible with the PreTradeValidator and runs validation checks.
+
+        Args:
+            order: Paper trading order to validate.
+            current_price: Current market price for the symbol.
+            portfolio_manager: Portfolio state manager with current positions.
+
+        Returns:
+            ValidationResult with validation outcome, warnings, and errors.
+        """
+        # Convert paper trading order to pre-trade order format
+        pretrade_action = (
+            PreTradeOrderAction.BUY
+            if order.action == OrderAction.BUY
+            else PreTradeOrderAction.SELL
+        )
+        pretrade_order_type = (
+            PreTradeOrderType.MARKET
+            if order.order_type == OrderType.MARKET
+            else PreTradeOrderType.LIMIT
+        )
+
+        pretrade_order = PreTradeOrder(
+            symbol=order.symbol,
+            action=pretrade_action,
+            quantity=order.quantity,
+            price=current_price,
+            order_type=pretrade_order_type,
+            timestamp=order.created_at,
+        )
+
+        # Convert portfolio state to pre-trade portfolio format
+        holdings: dict[str, Decimal] = {}
+        prices: dict[str, Decimal] = {}
+
+        for symbol, position in portfolio_manager.get_current_positions().items():
+            holdings[symbol] = position.shares
+            prices[symbol] = position.current_price
+
+        # Ensure the order's symbol has a price entry
+        if order.symbol not in prices:
+            prices[order.symbol] = current_price
+
+        # type: ignore comments needed for pyrefly compatibility with Pydantic LaxStr
+        pretrade_portfolio = PreTradePortfolio(
+            holdings=holdings,  # type: ignore[arg-type]
+            cash_balance=portfolio_manager.get_cash_balance().amount,
+            prices=prices,  # type: ignore[arg-type]
+        )
+
+        # Run pre-trade validation
+        return self.pretrade_validator.validate_order(
+            pretrade_order, pretrade_portfolio
+        )
+
+    def get_pretrade_warnings(
+        self,
+        order: PaperOrder,
+        current_price: Decimal,
+        portfolio_manager: PortfolioStateManager,
+    ) -> list[str]:
+        """Get pre-trade validation warnings without blocking execution.
+
+        Useful for previewing potential issues before committing to an order.
+
+        Args:
+            order: Paper trading order to check.
+            current_price: Current market price for the symbol.
+            portfolio_manager: Portfolio state manager with current positions.
+
+        Returns:
+            List of warning messages (empty if no warnings).
+        """
+        result = self._validate_pretrade_risk(order, current_price, portfolio_manager)
+        return result.warnings
 
     def _simulate_execution_delay(self) -> None:
         """Simulate execution delay."""
