@@ -284,6 +284,22 @@ User asks about portfolio optimization:
      - `--max-average A`: Overall average must be A
    - Ruff C901 rule also enforces max-complexity of 10
 
+6. Pre-commit Hooks (Automated Quality Gates)
+   - Install: `uv run pre-commit install` (one-time setup)
+   - Manual run: `uv run pre-commit run --all-files`
+   - Auto-runs on `git commit` to prevent broken code from being committed
+   - Hook execution order:
+     1. File hygiene (trailing whitespace, EOF, YAML/TOML syntax)
+     2. isort (import sorting)
+     3. ruff format (code formatting)
+     4. ruff check (linting)
+     5. bandit (security scanning)
+     6. pyrefly (type checking)
+   - Configuration in `.pre-commit-config.yaml`
+   - All hooks use `uv run` for consistency with CI and local development
+   - Hooks will FAIL the commit if any check fails
+   - To bypass hooks (NOT recommended): `git commit --no-verify`
+   - Best practice: Fix issues instead of bypassing hooks
 
 ## Error Resolution
 

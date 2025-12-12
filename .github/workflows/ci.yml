@@ -41,6 +41,11 @@ jobs:
       - name: Security scan with Bandit
         run: uv run bandit -c pyproject.toml -r . --severity-level medium
 
+      - name: Dependency vulnerability scan with pip-audit
+        run: |
+          uv export --no-hashes | grep -v "^financeportfolio" | grep -v "^-e" | grep -v "file://" > /tmp/requirements.txt
+          uv run pip-audit -r /tmp/requirements.txt --desc on --strict
+
       - name: Complexity check with Xenon
         run: uv run xenon --max-absolute C --max-modules B --max-average B src/ --exclude ".venv,venv"
 
