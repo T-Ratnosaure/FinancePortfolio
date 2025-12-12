@@ -75,3 +75,8 @@ skips = ["B101"]  # Skip assert warnings (tests use asserts)
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.pyrefly]
+# Pyrefly type checking configuration
+# Default settings are generally good, but we can customize if needed
+# See: https://github.com/astral-sh/pyrefly

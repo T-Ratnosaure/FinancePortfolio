@@ -110,3 +110,80 @@ class TestFREDFetcher:
         finally:
             if original:
                 os.environ["FRED_API_KEY"] = original
+
+    def test_rate_limit_enforcement(self) -> None:
+        """Test that rate limiting is enforced between requests."""
+        import time
+
+        from src.data.fetchers.fred import FREDFetcher
+
+        # Create fetcher with very short delay for testing
+        fetcher = FREDFetcher(api_key="test_key", delay_between_requests=0.1)
+
+        # First call should set the timestamp
+        fetcher._rate_limit()
+
+        # Second call should be delayed
+        start_time = time.time()
+        fetcher._rate_limit()
+        second_call_time = time.time() - start_time
+
+        # Second call should take at least the delay time
+        assert second_call_time >= 0.1
+
+    def test_retry_configuration(self) -> None:
+        """Test that retry configuration is stored correctly."""
+        from src.data.fetchers.fred import FREDFetcher
+
+        fetcher = FREDFetcher(
+            api_key="test_key",
+            delay_between_requests=0.3,
+            max_retries=5,
+        )
+
+        assert fetcher._delay == 0.3
+        assert fetcher._max_retries == 5
+
+    @pytest.mark.skip(reason="Requires FRED API key and network")
+    def test_retry_on_rate_limit(self) -> None:
+        """Test that retry logic works for rate limit errors."""
+        from datetime import date
+        from unittest.mock import MagicMock, patch
+
+        from src.data.fetchers.fred import FREDFetcher
+
+        fetcher = FREDFetcher()
+
+        # Mock the client to raise rate limit error first, then succeed
+        with patch.object(fetcher._client, "get_series") as mock_get:
+            mock_get.side_effect = [
+                Exception("429 Too Many Requests"),
+                MagicMock(empty=False, __iter__=lambda x: iter([1, 2, 3])),
+            ]
+
+            # Should succeed after retry
+            result = fetcher._fetch_series(
+                "VIXCLS", date(2024, 1, 1), date(2024, 1, 31)
+            )
+            assert result is not None
+
+    @pytest.mark.skip(reason="Requires FRED API key and network")
+    def test_data_not_available_error(self) -> None:
+        """Test that DataNotAvailableError is raised for empty data."""
+        from datetime import date
+        from unittest.mock import patch
+
+        import pandas as pd
+
+        from src.data.fetchers.fred import FREDFetcher
+
+        fetcher = FREDFetcher()
+
+        # Mock the client to return empty series
+        with patch.object(fetcher._client, "get_series") as mock_get:
+            mock_get.return_value = pd.Series([], dtype=float)
+
+            with pytest.raises(DataNotAvailableError, match="No data returned"):
+                fetcher._fetch_series(
+                    "INVALID_SERIES", date(2024, 1, 1), date(2024, 1, 31)
+                )

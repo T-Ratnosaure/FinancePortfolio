@@ -4,7 +4,7 @@ This module defines all data models used throughout the portfolio system,
 including ETF data, macro indicators, regime detection, positions, and trades.
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from enum import Enum
 
@@ -278,6 +278,165 @@ MAX_SINGLE_POSITION = 0.25
 MIN_CASH_BUFFER = 0.10
 REBALANCE_THRESHOLD = 0.05
 DRAWDOWN_ALERT = -0.20
+
+
+class DataCategory(str, Enum):
+    """Category of data for freshness tracking."""
+
+    PRICE_DATA = "price_data"  # ETF prices
+    MACRO_DATA = "macro_data"  # Macroeconomic indicators
+    PORTFOLIO_DATA = "portfolio_data"  # Portfolio positions
+    TRADE_DATA = "trade_data"  # Trade records
+
+
+class FreshnessStatus(str, Enum):
+    """Data freshness status."""
+
+    FRESH = "fresh"  # Within acceptable staleness threshold
+    STALE = "stale"  # Beyond staleness threshold but usable with warning
+    CRITICAL = "critical"  # Too old to use safely
+
+
+# Staleness thresholds by data category
+STALENESS_THRESHOLDS = {
+    DataCategory.PRICE_DATA: timedelta(days=1),  # Daily prices should be < 1 day old
+    DataCategory.MACRO_DATA: timedelta(days=7),  # Macro data can be < 1 week old
+    DataCategory.PORTFOLIO_DATA: timedelta(hours=1),  # Positions should be < 1 hour
+    DataCategory.TRADE_DATA: timedelta(days=365 * 100),  # Historical, no threshold
+}
+
+# Critical thresholds (data is too old to use)
+CRITICAL_THRESHOLDS = {
+    DataCategory.PRICE_DATA: timedelta(days=7),  # Price data > 1 week is critical
+    DataCategory.MACRO_DATA: timedelta(days=30),  # Macro data > 1 month is critical
+    DataCategory.PORTFOLIO_DATA: timedelta(hours=24),  # Positions > 1 day critical
+    DataCategory.TRADE_DATA: timedelta(days=365 * 100),  # No critical threshold
+}
+
+
+class DataFreshness(BaseModel):
+    """Metadata about data freshness for staleness detection.
+
+    Attributes:
+        data_category: Category of data (price, macro, portfolio, trade)
+        symbol: Optional symbol for symbol-specific data
+        indicator_name: Optional indicator name for macro data
+        last_updated: Timestamp when data was last fetched/updated
+        record_count: Number of records in this dataset
+        source: Data source (e.g., 'Yahoo Finance', 'FRED')
+    """
+
+    data_category: DataCategory
+    symbol: str | None = None
+    indicator_name: str | None = None
+    last_updated: datetime
+    record_count: int = Field(ge=0)
+    source: str
+
+    def get_age(self) -> timedelta:
+        """Calculate age of the data.
+
+        Returns:
+            Time elapsed since last update
+        """
+        return datetime.now() - self.last_updated
+
+    def get_status(self) -> FreshnessStatus:
+        """Determine freshness status of the data.
+
+        Returns:
+            FreshnessStatus enum value
+        """
+        age = self.get_age()
+        staleness_threshold = STALENESS_THRESHOLDS[self.data_category]
+        critical_threshold = CRITICAL_THRESHOLDS[self.data_category]
+
+        if age > critical_threshold:
+            return FreshnessStatus.CRITICAL
+        if age > staleness_threshold:
+            return FreshnessStatus.STALE
+        return FreshnessStatus.FRESH
+
+    def is_stale(self) -> bool:
+        """Check if data is stale (beyond normal threshold).
+
+        Returns:
+            True if data is stale or critical
+        """
+        return self.get_status() in (FreshnessStatus.STALE, FreshnessStatus.CRITICAL)
+
+    def is_critical(self) -> bool:
+        """Check if data staleness is critical (too old to use safely).
+
+        Returns:
+            True if data is critically stale
+        """
+        return self.get_status() == FreshnessStatus.CRITICAL
+
+    def get_warning_message(self) -> str | None:
+        """Generate warning message if data is stale.
+
+        Returns:
+            Warning message if stale, None if fresh
+        """
+        status = self.get_status()
+        if status == FreshnessStatus.FRESH:
+            return None
+
+        age = self.get_age()
+        age_str = self._format_age(age)
+
+        identifier = ""
+        if self.symbol:
+            identifier = f" for {self.symbol}"
+        elif self.indicator_name:
+            identifier = f" for {self.indicator_name}"
+
+        if status == FreshnessStatus.CRITICAL:
+            return (
+                f"CRITICAL: {self.data_category.value}{identifier} "
+                f"is {age_str} old (last updated: {self.last_updated}). "
+                f"Data may be too stale for reliable decisions."
+            )
+        return (
+            f"WARNING: {self.data_category.value}{identifier} is {age_str} old "
+            f"(last updated: {self.last_updated}). "
+            f"Consider refreshing data."
+        )
+
+    def _format_age(self, age: timedelta) -> str:
+        """Format age as human-readable string.
+
+        Args:
+            age: Time delta to format
+
+        Returns:
+            Human-readable age string
+        """
+        total_seconds = int(age.total_seconds())
+        days = total_seconds // 86400
+        hours = (total_seconds % 86400) // 3600
+        minutes = (total_seconds % 3600) // 60
+
+        if days > 0:
+            return f"{days} day{'s' if days != 1 else ''}"
+        if hours > 0:
+            return f"{hours} hour{'s' if hours != 1 else ''}"
+        return f"{minutes} minute{'s' if minutes != 1 else ''}"
+
+
+class StaleDataError(Exception):
+    """Raised when attempting to use critically stale data."""
+
+    def __init__(self, freshness: DataFreshness) -> None:
+        """Initialize stale data error.
+
+        Args:
+            freshness: DataFreshness object with stale data info
+        """
+        self.freshness = freshness
+        message = freshness.get_warning_message() or "Data is too stale for safe usage"
+        super().__init__(message)
 
 
 # PEA-eligible ETF registry

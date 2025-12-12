@@ -44,6 +44,9 @@ jobs:
       - name: Complexity check with Xenon
         run: uv run xenon --max-absolute C --max-modules B --max-average B src/ --exclude ".venv,venv"
 
+      - name: Type check with pyrefly
+        run: uv run pyrefly check
+
       - name: Run tests with pytest
         run: uv run pytest -v --cov --cov-report=term-missing
 

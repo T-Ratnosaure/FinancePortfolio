@@ -12,10 +12,15 @@ import pytest
 
 from src.data.models import Regime
 from src.signals.regime import (
+    ABSOLUTE_MIN_SAMPLES,
+    MIN_SAMPLES_PER_PARAMETER,
     FeatureDimensionError,
+    InsufficientSamplesError,
     NotFittedError,
     RegimeDetector,
     RegimeDetectorConfig,
+    calculate_hmm_parameters,
+    calculate_min_samples,
 )
 
 
@@ -90,6 +95,9 @@ class TestRegimeDetectorFit:
         - Low VIX, positive trend, tight spreads (RISK_ON)
         - Medium VIX, mixed trend, normal spreads (NEUTRAL)
         - High VIX, negative trend, wide spreads (RISK_OFF)
+
+        Note: This uses small sample sizes for testing purposes.
+        Production use requires 1700+ samples for reliable HMM fitting.
         """
         rng = np.random.default_rng(42)
         n_samples_per_regime = 50
@@ -116,47 +124,48 @@ class TestRegimeDetectorFit:
     def test_fit_returns_self(self, sample_features: np.ndarray) -> None:
         """Test that fit returns self for chaining."""
         detector = RegimeDetector()
-        result = detector.fit(sample_features)
+        # Use skip_sample_validation for testing with small samples
+        result = detector.fit(sample_features, skip_sample_validation=True)
         assert result is detector
 
     def test_fit_sets_is_fitted(self, sample_features: np.ndarray) -> None:
         """Test that fit sets is_fitted flag."""
         detector = RegimeDetector()
         assert not detector.is_fitted
-        detector.fit(sample_features)
+        detector.fit(sample_features, skip_sample_validation=True)
         assert detector.is_fitted
 
     def test_fit_sets_n_features(self, sample_features: np.ndarray) -> None:
         """Test that fit records number of features."""
         detector = RegimeDetector()
-        detector.fit(sample_features)
+        detector.fit(sample_features, skip_sample_validation=True)
         assert detector.n_features == 3
 
     def test_fit_empty_features_raises(self) -> None:
         """Test that empty features array raises ValueError."""
         detector = RegimeDetector()
         with pytest.raises(ValueError, match="empty"):
-            detector.fit(np.array([]))
+            detector.fit(np.array([]), skip_sample_validation=True)
 
     def test_fit_insufficient_samples_raises(self) -> None:
-        """Test that insufficient samples raises ValueError."""
+        """Test that insufficient samples raises InsufficientSamplesError."""
         detector = RegimeDetector(n_states=3)
-        # Need at least 9 samples for 3 states
-        features = np.random.randn(5, 3)
-        with pytest.raises(ValueError, match="Insufficient training samples"):
+        # Small sample size should raise error
+        features = np.random.randn(100, 3)
+        with pytest.raises(InsufficientSamplesError):
             detector.fit(features)
 
     def test_fit_1d_features(self) -> None:
         """Test that 1D features are reshaped correctly."""
         detector = RegimeDetector(n_states=2)
         features = np.random.randn(50)  # 1D array
-        detector.fit(features)
+        detector.fit(features, skip_sample_validation=True)
         assert detector.n_features == 1
 
     def test_fit_state_mapping_created(self, sample_features: np.ndarray) -> None:
         """Test that state-to-regime mapping is created after fit."""
         detector = RegimeDetector()
-        detector.fit(sample_features)
+        detector.fit(sample_features, skip_sample_validation=True)
         # Internal state mapping should exist
         assert detector._state_to_regime is not None
         assert len(detector._state_to_regime) == 3
@@ -169,13 +178,16 @@ class TestRegimeDetectorPredict:
     def fitted_detector(self) -> RegimeDetector:
         """Create a fitted detector for prediction tests.
 
-        Uses large sample sizes and very tight standard deviations to ensure
-        the HMM can clearly identify the three distinct clusters.
+        Uses tight standard deviations to ensure the HMM can clearly identify
+        the three distinct clusters.
+
+        Note: Uses skip_sample_validation=True for testing purposes.
+        Production use requires 1700+ samples for reliable HMM fitting.
         """
         rng = np.random.default_rng(42)
 
         # Create very clear regime separation with tight clusters
-        # Large sample size and small variance ensure HMM converges correctly
+        # Small variance ensures HMM converges correctly even with test data
         risk_on = rng.normal(
             loc=[10, 0.05, 0.5], scale=[0.5, 0.005, 0.02], size=(100, 3)
         )
@@ -189,7 +201,7 @@ class TestRegimeDetectorPredict:
         features = np.vstack([risk_on, neutral, risk_off])
 
         detector = RegimeDetector(random_state=42)
-        detector.fit(features)
+        detector.fit(features, skip_sample_validation=True)
         return detector
 
     def test_predict_regime_returns_regime_enum(
@@ -274,7 +286,10 @@ class TestRegimeDetectorProbabilities:
 
     @pytest.fixture
     def fitted_detector(self) -> RegimeDetector:
-        """Create a fitted detector for probability tests."""
+        """Create a fitted detector for probability tests.
+
+        Note: Uses skip_sample_validation=True for testing purposes.
+        """
         rng = np.random.default_rng(42)
 
         risk_on = rng.normal(loc=[10, 0.05, 0.5], scale=[1, 0.01, 0.05], size=(30, 3))
@@ -284,7 +299,7 @@ class TestRegimeDetectorProbabilities:
         features = np.vstack([risk_on, neutral, risk_off])
 
         detector = RegimeDetector(random_state=42)
-        detector.fit(features)
+        detector.fit(features, skip_sample_validation=True)
         return detector
 
     def test_probabilities_return_all_regimes(
@@ -337,7 +352,10 @@ class TestRegimeDetectorTransition:
 
     @pytest.fixture
     def fitted_detector(self) -> RegimeDetector:
-        """Create a fitted detector for transition tests."""
+        """Create a fitted detector for transition tests.
+
+        Note: Uses skip_sample_validation=True for testing purposes.
+        """
         rng = np.random.default_rng(42)
 
         risk_on = rng.normal(loc=[10, 0.05, 0.5], scale=[2, 0.02, 0.1], size=(30, 3))
@@ -347,7 +365,7 @@ class TestRegimeDetectorTransition:
         features = np.vstack([risk_on, neutral, risk_off])
 
         detector = RegimeDetector(random_state=42)
-        detector.fit(features)
+        detector.fit(features, skip_sample_validation=True)
         return detector
 
     def test_transition_matrix_shape(self, fitted_detector: RegimeDetector) -> None:
@@ -417,7 +435,10 @@ class TestRegimeDetectorPersistence:
 
     @pytest.fixture
     def fitted_detector(self) -> RegimeDetector:
-        """Create a fitted detector for persistence tests."""
+        """Create a fitted detector for persistence tests.
+
+        Note: Uses skip_sample_validation=True for testing purposes.
+        """
         rng = np.random.default_rng(42)
 
         risk_on = rng.normal(loc=[10, 0.05, 0.5], scale=[2, 0.02, 0.1], size=(30, 3))
@@ -427,7 +448,7 @@ class TestRegimeDetectorPersistence:
         features = np.vstack([risk_on, neutral, risk_off])
 
         detector = RegimeDetector(random_state=42)
-        detector.fit(features)
+        detector.fit(features, skip_sample_validation=True)
         return detector
 
     def test_save_creates_file(self, fitted_detector: RegimeDetector) -> None:
@@ -507,7 +528,10 @@ class TestRegimeDetectorStateCharacteristics:
 
     @pytest.fixture
     def fitted_detector(self) -> RegimeDetector:
-        """Create a fitted detector for characteristics tests."""
+        """Create a fitted detector for characteristics tests.
+
+        Note: Uses skip_sample_validation=True for testing purposes.
+        """
         rng = np.random.default_rng(42)
 
         # Use distinct means for easy verification
@@ -522,7 +546,7 @@ class TestRegimeDetectorStateCharacteristics:
         features = np.vstack([risk_on, neutral, risk_off])
 
         detector = RegimeDetector(random_state=42)
-        detector.fit(features)
+        detector.fit(features, skip_sample_validation=True)
         return detector
 
     def test_characteristics_returns_all_regimes(
@@ -561,6 +585,7 @@ class TestRegimeDetectorEdgeCases:
 
         Note: HMM convergence with 2 states can be challenging. This test
         verifies the API works correctly rather than specific predictions.
+        Uses skip_sample_validation=True for testing purposes.
         """
         rng = np.random.default_rng(42)
 
@@ -570,7 +595,7 @@ class TestRegimeDetectorEdgeCases:
         features = np.vstack([low, high])
 
         detector = RegimeDetector(n_states=2, random_state=42)
-        detector.fit(features)
+        detector.fit(features, skip_sample_validation=True)
 
         # Verify model is fitted
         assert detector.is_fitted
@@ -592,7 +617,10 @@ class TestRegimeDetectorEdgeCases:
         assert probs[Regime.NEUTRAL] == 0.0
 
     def test_single_feature(self) -> None:
-        """Test detector with single feature."""
+        """Test detector with single feature.
+
+        Note: Uses skip_sample_validation=True for testing purposes.
+        """
         rng = np.random.default_rng(42)
 
         low = rng.normal(loc=10, scale=2, size=(30,))
@@ -602,22 +630,25 @@ class TestRegimeDetectorEdgeCases:
         features = np.concatenate([low, medium, high])
 
         detector = RegimeDetector(random_state=42)
-        detector.fit(features)
+        detector.fit(features, skip_sample_validation=True)
 
         assert detector.n_features == 1
         assert detector.is_fitted
 
     def test_reproducibility_with_random_state(self) -> None:
-        """Test that same random_state produces same results."""
+        """Test that same random_state produces same results.
+
+        Note: Uses skip_sample_validation=True for testing purposes.
+        """
         rng = np.random.default_rng(42)
 
         features = rng.normal(loc=[15, 0.0, 1.0], scale=[10, 0.05, 0.5], size=(100, 3))
 
         detector1 = RegimeDetector(random_state=123)
-        detector1.fit(features)
+        detector1.fit(features, skip_sample_validation=True)
 
         detector2 = RegimeDetector(random_state=123)
-        detector2.fit(features)
+        detector2.fit(features, skip_sample_validation=True)
 
         test_features = np.array([[15, 0.0, 1.0]])
         probs1 = detector1.predict_regime_probabilities(test_features)
@@ -627,7 +658,10 @@ class TestRegimeDetectorEdgeCases:
             assert abs(probs1[regime] - probs2[regime]) < 1e-6
 
     def test_many_features(self) -> None:
-        """Test detector with many features."""
+        """Test detector with many features.
+
+        Note: Uses skip_sample_validation=True for testing purposes.
+        """
         rng = np.random.default_rng(42)
         n_features = 10
 
@@ -638,7 +672,204 @@ class TestRegimeDetectorEdgeCases:
         features[66:, 0] = rng.normal(loc=35, scale=2, size=34)
 
         detector = RegimeDetector(random_state=42)
-        detector.fit(features)
+        detector.fit(features, skip_sample_validation=True)
 
         assert detector.n_features == n_features
         assert detector.is_fitted
+
+
+class TestMinimumSampleSizeValidation:
+    """Tests for HMM minimum sample size calculation and validation.
+
+    These tests verify the mathematical correctness of the parameter counting
+    and the minimum sample size requirements for reliable HMM fitting.
+    """
+
+    def test_calculate_hmm_parameters_full_covariance(self) -> None:
+        """Test parameter count for full covariance HMM.
+
+        For n_states=3, n_features=9, full covariance:
+        - Initial: 2 parameters
+        - Transition: 6 parameters
+        - Means: 27 parameters
+        - Covariance: 3 * (9*10/2) = 135 parameters
+        - Total: 170 parameters
+        """
+        n_params = calculate_hmm_parameters(
+            n_states=3, n_features=9, covariance_type="full"
+        )
+        # Expected: 2 + 6 + 27 + 135 = 170
+        assert n_params == 170
+
+    def test_calculate_hmm_parameters_diagonal_covariance(self) -> None:
+        """Test parameter count for diagonal covariance HMM.
+
+        For n_states=3, n_features=9, diagonal covariance:
+        - Initial: 2 parameters
+        - Transition: 6 parameters
+        - Means: 27 parameters
+        - Covariance: 3 * 9 = 27 parameters
+        - Total: 62 parameters
+        """
+        n_params = calculate_hmm_parameters(
+            n_states=3, n_features=9, covariance_type="diag"
+        )
+        # Expected: 2 + 6 + 27 + 27 = 62
+        assert n_params == 62
+
+    def test_calculate_hmm_parameters_spherical_covariance(self) -> None:
+        """Test parameter count for spherical covariance HMM.
+
+        For n_states=3, n_features=9, spherical covariance:
+        - Initial: 2 parameters
+        - Transition: 6 parameters
+        - Means: 27 parameters
+        - Covariance: 3 parameters (one per state)
+        - Total: 38 parameters
+        """
+        n_params = calculate_hmm_parameters(
+            n_states=3, n_features=9, covariance_type="spherical"
+        )
+        # Expected: 2 + 6 + 27 + 3 = 38
+        assert n_params == 38
+
+    def test_calculate_hmm_parameters_tied_covariance(self) -> None:
+        """Test parameter count for tied covariance HMM.
+
+        For n_states=3, n_features=9, tied covariance:
+        - Initial: 2 parameters
+        - Transition: 6 parameters
+        - Means: 27 parameters
+        - Covariance: 9*10/2 = 45 parameters (shared)
+        - Total: 80 parameters
+        """
+        n_params = calculate_hmm_parameters(
+            n_states=3, n_features=9, covariance_type="tied"
+        )
+        # Expected: 2 + 6 + 27 + 45 = 80
+        assert n_params == 80
+
+    def test_calculate_min_samples_default(self) -> None:
+        """Test minimum sample calculation for default 3-state, 9-feature HMM."""
+        min_samples = calculate_min_samples(
+            n_states=3, n_features=9, covariance_type="full"
+        )
+        # 170 parameters * 10 samples/param = 1700
+        # max(1700, 1260) = 1700
+        assert min_samples == 1700
+
+    def test_calculate_min_samples_respects_absolute_minimum(self) -> None:
+        """Test that absolute minimum is enforced for simple models."""
+        # Very simple model: 2 states, 1 feature, spherical covariance
+        # Parameters: 1 + 2 + 2 + 2 = 7
+        # 7 * 10 = 70 < 1260 (absolute minimum)
+        min_samples = calculate_min_samples(
+            n_states=2, n_features=1, covariance_type="spherical"
+        )
+        assert min_samples == ABSOLUTE_MIN_SAMPLES
+
+    def test_calculate_min_samples_diagonal_vs_full(self) -> None:
+        """Test that diagonal covariance requires fewer samples than full."""
+        min_diag = calculate_min_samples(
+            n_states=3, n_features=9, covariance_type="diag"
+        )
+        min_full = calculate_min_samples(
+            n_states=3, n_features=9, covariance_type="full"
+        )
+        # Both should exceed absolute minimum
+        assert min_diag >= ABSOLUTE_MIN_SAMPLES
+        assert min_full >= ABSOLUTE_MIN_SAMPLES
+        # Full covariance should require more samples
+        assert min_full > min_diag
+
+    def test_insufficient_samples_error_raised(self) -> None:
+        """Test that InsufficientSamplesError is raised for small datasets."""
+        detector = RegimeDetector(n_states=3)
+        # 500 samples is way below the ~1700 required for 3-state, 9-feature HMM
+        features = np.random.randn(500, 9)
+
+        with pytest.raises(InsufficientSamplesError) as exc_info:
+            detector.fit(features)
+
+        # Verify error message contains helpful information
+        error_msg = str(exc_info.value)
+        assert "500" in error_msg  # Shows received samples
+        assert "1,700" in error_msg or "1700" in error_msg  # Shows required
+        assert "states" in error_msg.lower()
+        assert "features" in error_msg.lower()
+
+    def test_sufficient_samples_no_error(self) -> None:
+        """Test that sufficient samples allows fitting without error."""
+        detector = RegimeDetector(n_states=3)
+        # Generate enough samples for 3-state, 3-feature model
+        # Parameters: 2 + 6 + 9 + 18 = 35 for full covariance
+        # Need: max(35 * 10, 1260) = 1260
+        rng = np.random.default_rng(42)
+
+        # Create well-separated clusters with 1300 samples (above 1260 minimum)
+        risk_on = rng.normal(loc=[10, 0.05, 0.5], scale=[2, 0.02, 0.1], size=(450, 3))
+        neutral = rng.normal(loc=[20, 0.0, 1.0], scale=[2, 0.02, 0.1], size=(450, 3))
+        risk_off = rng.normal(loc=[35, -0.05, 2.0], scale=[2, 0.02, 0.1], size=(450, 3))
+        features = np.vstack([risk_on, neutral, risk_off])
+
+        # This should not raise any exception
+        detector.fit(features)
+        assert detector.is_fitted
+
+    def test_skip_sample_validation_allows_small_data(self) -> None:
+        """Test that skip_sample_validation=True bypasses the check."""
+        detector = RegimeDetector(n_states=3)
+        # Very small dataset that would normally fail
+        features = np.random.randn(50, 3)
+
+        # Should not raise with skip_sample_validation=True
+        detector.fit(features, skip_sample_validation=True)
+        assert detector.is_fitted
+
+    def test_constants_have_reasonable_values(self) -> None:
+        """Test that module constants have reasonable values."""
+        # MIN_SAMPLES_PER_PARAMETER should be >= 10 for statistical reliability
+        assert MIN_SAMPLES_PER_PARAMETER >= 10
+
+        # ABSOLUTE_MIN_SAMPLES should be at least 5 years of daily data
+        # 5 years * 252 trading days = 1260
+        assert ABSOLUTE_MIN_SAMPLES >= 1260
+
+    def test_error_message_includes_recommendations(self) -> None:
+        """Test that error message includes actionable recommendations."""
+        detector = RegimeDetector(n_states=3)
+        features = np.random.randn(100, 9)
+
+        with pytest.raises(InsufficientSamplesError) as exc_info:
+            detector.fit(features)
+
+        error_msg = str(exc_info.value)
+
+        # Should include recommendation to get more data
+        assert "year" in error_msg.lower()
+
+        # Should mention ways to reduce model complexity
+        assert "diag" in error_msg.lower() or "spherical" in error_msg.lower()
+        assert "features" in error_msg.lower()
+        assert "states" in error_msg.lower()
+
+    def test_financial_regime_detection_requirements(self) -> None:
+        """Test minimum samples for typical financial regime detection setup.
+
+        Standard setup: 3 states, 9 features, full covariance.
+        This requires approximately 7 years of daily financial data.
+        """
+        # Calculate for typical financial regime detection
+        min_samples = calculate_min_samples(
+            n_states=3, n_features=9, covariance_type="full"
+        )
+
+        # Should require approximately 7 years of daily data
+        trading_days_per_year = 252
+        years_of_data = min_samples / trading_days_per_year
+
+        # Should be between 6 and 8 years
+        assert 6.0 <= years_of_data <= 8.0
+
+        # Specifically, 1700 samples / 252 days ~= 6.75 years
+        assert min_samples >= 1700
