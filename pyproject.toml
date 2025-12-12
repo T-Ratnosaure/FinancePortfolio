@@ -75,10 +75,12 @@ max-complexity = 10
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]  # Allow assert in tests
 "scripts/security_audit.py" = ["S603", "S607"]  # Security audit script runs trusted subprocess commands
+"src/paper_trading/storage.py" = ["S608"]  # SQL uses class constant SCHEMA, not user input
+"src/paper_trading/executor.py" = ["S311"]  # Random for simulation, not cryptography
 
 [tool.bandit]
 exclude_dirs = ["tests", ".venv", "venv", "scripts"]
-skips = ["B101"]  # Skip assert warnings (tests use asserts)
+skips = ["B101", "B608"]  # Skip assert warnings (tests) and SQL hardcoded strings (SCHEMA is a class constant)
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
