@@ -24,11 +24,16 @@ dependencies = [
     "plotly>=6.5.0",
     "pydantic>=2.12.5",
     "python-dotenv>=1.2.1",
+    "rich>=14.2.0",
     "scipy>=1.16.3",
     "streamlit>=1.52.1",
     "tenacity>=9.1.2",
+    "typer>=0.20.0",
     "yfinance>=0.2.66",
 ]
+
+[project.scripts]
+pea-portfolio = "src.cli.main:cli_main"
 
 [dependency-groups]
 dev = [
