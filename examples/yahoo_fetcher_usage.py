@@ -40,7 +40,7 @@ def main() -> None:
     # Example 2: Fetch using ETFSymbol enum values directly
     from src.data.models import ETFSymbol
 
-    enum_symbols = [ETFSymbol.CL2, ETFSymbol.WPEA]
+    enum_symbols: list[ETFSymbol | str] = [ETFSymbol.CL2, ETFSymbol.WPEA]
     try:
         prices = fetcher.fetch_etf_prices(enum_symbols, start_date, end_date)
         print(f"Fetched {len(prices)} price records using enum symbols")
