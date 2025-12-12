@@ -39,6 +39,8 @@ pea-portfolio = "src.cli.main:cli_main"
 dev = [
     "bandit>=1.9.2",
     "isort>=7.0.0",
+    "pip-audit>=2.10.0",
+    "pre-commit>=4.0.0",
     "pyrefly>=0.45.1",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
@@ -72,9 +74,10 @@ max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]  # Allow assert in tests
+"scripts/security_audit.py" = ["S603", "S607"]  # Security audit script runs trusted subprocess commands
 
 [tool.bandit]
-exclude_dirs = ["tests", ".venv", "venv"]
+exclude_dirs = ["tests", ".venv", "venv", "scripts"]
 skips = ["B101"]  # Skip assert warnings (tests use asserts)
 
 [tool.pytest.ini_options]

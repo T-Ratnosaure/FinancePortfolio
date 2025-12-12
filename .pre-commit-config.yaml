@@ -1,0 +1,99 @@
+# Pre-commit hooks for FinancePortfolio
+# Run: uv run pre-commit run --all-files (manual)
+# Install: uv run pre-commit install (auto-run on git commit)
+#
+# Hook execution order matches CI pipeline:
+# 1. Basic file hygiene (whitespace, EOF)
+# 2. Import sorting (isort - AUTHORITATIVE)
+# 3. Code formatting (ruff format)
+# 4. Linting (ruff check)
+# 5. Security scanning (bandit)
+# 6. Type checking (pyrefly)
+#
+# This ensures local commits match CI requirements and prevents
+# broken commits from reaching the repository.
+
+repos:
+  # Basic file hygiene - fast checks first
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Remove trailing whitespace
+        description: Removes trailing whitespace from all files
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+        name: Fix end of files
+        description: Ensures files end with a newline
+      - id: check-yaml
+        name: Check YAML syntax
+        description: Validates YAML file syntax
+      - id: check-toml
+        name: Check TOML syntax
+        description: Validates TOML file syntax (pyproject.toml)
+      - id: check-added-large-files
+        name: Check for large files
+        description: Prevents accidentally committing large files
+        args: [--maxkb=1000]
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+        description: Detects merge conflict markers
+
+  # All Python tools use local repos to leverage UV-managed dependencies
+  # This ensures exact version consistency with pyproject.toml
+  - repo: local
+    hooks:
+      # Import sorting - isort is AUTHORITATIVE (must run before ruff format)
+      - id: isort
+        name: Sort imports with isort
+        description: Sorts Python imports according to black profile
+        entry: uv run isort
+        language: system
+        types: [python]
+        require_serial: false
+
+      # Code formatting - ruff format (runs after isort)
+      - id: ruff-format
+        name: Format code with ruff
+        description: Formats Python code (line length, etc.)
+        entry: uv run ruff format
+        language: system
+        types: [python]
+        require_serial: false
+
+      # Linting - ruff check (runs after formatting)
+      - id: ruff-check
+        name: Lint code with ruff
+        description: Checks for code quality issues
+        entry: uv run ruff check --fix
+        language: system
+        types: [python]
+        require_serial: false
+
+      # Security scanning - bandit (detects security issues)
+      - id: bandit
+        name: Security scan with bandit
+        description: Scans for common security vulnerabilities
+        entry: uv run bandit -c pyproject.toml -r . --severity-level medium
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
+      # Type checking - pyrefly (final validation)
+      - id: pyrefly-check
+        name: Type check with pyrefly
+        description: Validates type annotations
+        entry: uv run pyrefly check
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
+# Configuration notes:
+# - All Python tools use `uv run` for consistency with CI and development
+# - Tools read configuration from pyproject.toml
+# - Hooks fail fast - first failure stops the commit
+# - pass_filenames: false for tools that scan entire project (bandit, pyrefly)
+# - require_serial: true for expensive operations (bandit, pyrefly)
+# - Use --no-verify to skip hooks if absolutely necessary (NOT recommended)
